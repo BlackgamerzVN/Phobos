@@ -23,6 +23,8 @@ public:
 		Valueable<int> PowerPlantEnhancer_Amount;
 		Nullable<float> PowerPlantEnhancer_Factor;
 		Valueable<int> PowerPlantEnhancer_MaxCount;
+		std::map<int, int> PowerPlantEnhancer_AmountPerPlant;
+		std::map<int, float> PowerPlantEnhancer_FactorPerPlant;
 
 		std::vector<Point2D> OccupierMuzzleFlashes;
 		Valueable<bool> Powered_KillSpawns;
@@ -134,6 +136,8 @@ public:
 			, PowerPlantEnhancer_Amount { 0 }
 			, PowerPlantEnhancer_Factor { 1.0f }
 			, PowerPlantEnhancer_MaxCount { -1 }
+			, PowerPlantEnhancer_AmountPerPlant {}
+			, PowerPlantEnhancer_FactorPerPlant {}
 			, OccupierMuzzleFlashes()
 			, Powered_KillSpawns { false }
 			, CanC4_AllowZeroDamage { false }

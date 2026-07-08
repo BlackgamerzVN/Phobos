@@ -76,8 +76,12 @@ std::pair<int, int> BuildingTypeExt::GetEnhancedPower(BuildingTypeClass* pBuildi
 				continue;
 		}
 
-		factor *= pEnhancerTypeExt->PowerPlantEnhancer_Factor;
-		amount += pEnhancerTypeExt->PowerPlantEnhancer_Amount;
+		factor *= pEnhancerTypeExt->PowerPlantEnhancer_FactorPerPlant.count(pBuilding->ArrayIndex)
+			? pEnhancerTypeExt->PowerPlantEnhancer_FactorPerPlant.at(pBuilding->ArrayIndex)
+			: pEnhancerTypeExt->PowerPlantEnhancer_Factor.Get();
+		amount += pEnhancerTypeExt->PowerPlantEnhancer_AmountPerPlant.count(pBuilding->ArrayIndex)
+			? pEnhancerTypeExt->PowerPlantEnhancer_AmountPerPlant.at(pBuilding->ArrayIndex)
+			: pEnhancerTypeExt->PowerPlantEnhancer_Amount.Get();
 		++applied[pEnhancerType->ArrayIndex];
 	}
 
@@ -170,6 +174,36 @@ void BuildingTypeExt::ExtData::LoadFromINIFile(CCINIClass* const pINI)
 	this->PowerPlantEnhancer_Amount.Read(exINI, pSection, "PowerPlantEnhancer.Amount");
 	this->PowerPlantEnhancer_Factor.Read(exINI, pSection, "PowerPlantEnhancer.Factor");
 	this->PowerPlantEnhancer_MaxCount.Read(exINI, pSection, "PowerPlantEnhancer.MaxCount");
+
+	// Per-plant overrides for PowerPlantEnhancer.Amount / .Factor, e.g. PowerPlantEnhancer.Amount.NAPOWR=100
+	this->PowerPlantEnhancer_AmountPerPlant.clear();
+	this->PowerPlantEnhancer_FactorPerPlant.clear();
+
+	if (!this->PowerPlantEnhancer_Buildings.empty())
+	{
+		char tempBuffer[0x40];
+
+		for (auto pPlant : this->PowerPlantEnhancer_Buildings)
+		{
+			if (!pPlant)
+				continue;
+
+			Nullable<int> nAmount;
+			_snprintf_s(tempBuffer, sizeof(tempBuffer), "PowerPlantEnhancer.Amount.%s", pPlant->ID);
+			nAmount.Read(exINI, pSection, tempBuffer);
+
+			if (nAmount.isset())
+				this->PowerPlantEnhancer_AmountPerPlant[pPlant->ArrayIndex] = nAmount.Get();
+
+			Nullable<float> nFactor;
+			_snprintf_s(tempBuffer, sizeof(tempBuffer), "PowerPlantEnhancer.Factor.%s", pPlant->ID);
+			nFactor.Read(exINI, pSection, tempBuffer);
+
+			if (nFactor.isset())
+				this->PowerPlantEnhancer_FactorPerPlant[pPlant->ArrayIndex] = nFactor.Get();
+		}
+	}
+
 	this->Powered_KillSpawns.Read(exINI, pSection, "Powered.KillSpawns");
 	this->CanC4_AllowZeroDamage.Read(exINI, pSection, "CanC4.AllowZeroDamage");
 
@@ -347,6 +381,8 @@ void BuildingTypeExt::ExtData::Serialize(T& Stm)
 		.Process(this->PowerPlantEnhancer_Amount)
 		.Process(this->PowerPlantEnhancer_Factor)
 		.Process(this->PowerPlantEnhancer_MaxCount)
+		.Process(this->PowerPlantEnhancer_AmountPerPlant)
+		.Process(this->PowerPlantEnhancer_FactorPerPlant)
 		.Process(this->SuperWeapons)
 		.Process(this->OccupierMuzzleFlashes)
 		.Process(this->Powered_KillSpawns)
