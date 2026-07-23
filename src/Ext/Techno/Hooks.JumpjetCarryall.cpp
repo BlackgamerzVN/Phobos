@@ -4,6 +4,7 @@
 #include <InfantryClass.h>
 
 #include <Ext/Techno/Body.h>
+#include <Ext/Unit/Body.h>
 #include <Ext/UnitType/Body.h>
 
 // Jumpjet Carryall System for Vehicles
@@ -97,15 +98,12 @@ bool CanBeCarriedByJumpjetVehicle(UnitClass* pCarrier, TechnoClass* pTarget)
 	}
 
 	// Check if carrier already has cargo at capacity
-	if (pCarrier->HasAnyLink())
-	{
-		// TODO: Implement multi-cargo support
-		// For now, only allow one unit
+	// TODO: Implement multi-cargo support; for now, only allow one unit.
+	if (UnitExt::Fetch(pCarrier)->JumpjetCarryall_Cargo)
 		return false;
-	}
 
 	// Check if target is already being carried
-	if (pTargetFoot->BunkerLinkedItem)
+	if (FootExt::Fetch(pTargetFoot)->JumpjetCarryall_Carrier)
 		return false;
 
 	// Target cannot be mind-controlled if carrier doesn't own it
@@ -115,20 +113,11 @@ bool CanBeCarriedByJumpjetVehicle(UnitClass* pCarrier, TechnoClass* pTarget)
 	return true;
 }
 
-// Helper: Get cargo count for a jumpjet carryall
+// Helper: Get cargo count for a jumpjet carryall.
+// Only a single cargo slot is supported for now (see TODO in CanBeCarriedByJumpjetVehicle).
 int GetJumpjetCargoCount(UnitClass* pUnit)
 {
-	int count = 0;
-	if (pUnit->HasAnyLink())
-	{
-		auto pCargo = abstract_cast<FootClass*>(pUnit->AttachTrigger);
-		while (pCargo)
-		{
-			count++;
-			pCargo = abstract_cast<FootClass*>(pCargo->NextObject);
-		}
-	}
-	return count;
+	return UnitExt::Fetch(pUnit)->JumpjetCarryall_Cargo ? 1 : 0;
 }
 
 // Hook: Allow jumpjet vehicles to execute Enter mission (pickup)
@@ -182,11 +171,10 @@ DEFINE_HOOK(0x4CE8CF, FlyLocomotionClass_ILocomotion_MoveTo_JumpjetPickup, 0x6)
 			if (dist < pExt->JumpjetCarryall_PickupRange)
 			{
 				// Attach the target as cargo
-				pUnit->AttachTrigger = pTarget;
-				pTarget->BunkerLinkedItem = pUnit;
+				UnitExt::Fetch(pUnit)->JumpjetCarryall_Cargo = pTarget;
+				FootExt::Fetch(pTarget)->JumpjetCarryall_Carrier = pUnit;
 
 				// Hide the carried unit
-				pTarget->Remove();
 				pTarget->Limbo();
 
 				// Play pickup voice if set
@@ -196,7 +184,7 @@ DEFINE_HOOK(0x4CE8CF, FlyLocomotionClass_ILocomotion_MoveTo_JumpjetPickup, 0x6)
 				}
 				else
 				{
-					pUnit->QueueVoice(pType->VoiceMove);
+					pUnit->VoiceMove();
 				}
 
 				// Clear destination so carrier doesn't keep trying to move
@@ -221,7 +209,7 @@ DEFINE_HOOK(0x739B10, UnitClass_Mission_Unload_JumpjetCarryall, 0x6)
 	auto const pExt = UnitTypeExt::Fetch(pType);
 
 	// Check if we have cargo
-	auto const pCargo = abstract_cast<FootClass*>(pThis->AttachTrigger);
+	auto const pCargo = UnitExt::Fetch(pThis)->JumpjetCarryall_Cargo;
 	if (!pCargo)
 		return 0;
 
@@ -243,13 +231,13 @@ DEFINE_HOOK(0x739B10, UnitClass_Mission_Unload_JumpjetCarryall, 0x6)
 		}
 
 		// Detach cargo
-		pThis->AttachTrigger = nullptr;
-		pCargo->BunkerLinkedItem = nullptr;
+		UnitExt::Fetch(pThis)->JumpjetCarryall_Cargo = nullptr;
+		FootExt::Fetch(pCargo)->JumpjetCarryall_Carrier = nullptr;
 
 		// Place cargo on map
-		++Unsorted::IKnowWhatImDoing;
+		++Unsorted::ScenarioInit;
 		pCargo->Unlimbo(dropCoord, DirType::North);
-		--Unsorted::IKnowWhatImDoing;
+		--Unsorted::ScenarioInit;
 
 		// Make cargo visible again
 		pCargo->Transporter = nullptr;
@@ -270,7 +258,7 @@ DEFINE_HOOK(0x4D9FED, FootClass_Update_JumpjetCarryallCargo, 0x6)
 	GET(FootClass*, pThis, ESI);
 
 	// Check if this unit is being carried by a jumpjet
-	auto const pCarrier = abstract_cast<UnitClass*>(pThis->BunkerLinkedItem);
+	auto const pCarrier = FootExt::Fetch(pThis)->JumpjetCarryall_Carrier;
 	if (!pCarrier)
 		return 0;
 
@@ -280,10 +268,7 @@ DEFINE_HOOK(0x4D9FED, FootClass_Update_JumpjetCarryallCargo, 0x6)
 
 	// Keep cargo hidden and synchronized with carrier position
 	if (!pThis->InLimbo)
-	{
-		pThis->Remove();
 		pThis->Limbo();
-	}
 
 	return 0;
 }
@@ -303,7 +288,7 @@ DEFINE_HOOK(0x73C4F5, UnitClass_Draw_It_JumpjetCarryallCargo, 0x6)
 	if (!pExt->JumpjetCarryall_DrawCargo)
 		return 0;
 
-	auto const pCargo = abstract_cast<TechnoClass*>(pThis->AttachTrigger);
+	auto const pCargo = UnitExt::Fetch(pThis)->JumpjetCarryall_Cargo;
 	if (!pCargo)
 		return 0;
 
@@ -327,7 +312,7 @@ DEFINE_HOOK(0x4CE5B8, FlyLocomotionClass_GetCurrentSpeed_JumpjetCarryall, 0x6)
 		return 0;
 
 	// Only process if this is a jumpjet carryall with cargo
-	if (!IsJumpjetCarryall(pUnit) || !pUnit->HasAnyLink())
+	if (!IsJumpjetCarryall(pUnit) || !UnitExt::Fetch(pUnit)->JumpjetCarryall_Cargo)
 		return 0;
 
 	auto const pExt = UnitTypeExt::Fetch(pUnit->Type);
@@ -352,27 +337,27 @@ DEFINE_HOOK(0x4D97CD, FootClass_ReceiveDamage_JumpjetCarryallDeath, 0x6)
 	if (!pUnit || !IsJumpjetCarryall(pUnit))
 		return 0;
 
+	auto const pUnitExt = UnitExt::Fetch(pUnit);
+
 	// Check if carrier will die from this damage
-	if (pThis->Health - *pDamage <= 0 && pUnit->HasAnyLink())
+	if (pThis->Health - *pDamage <= 0 && pUnitExt->JumpjetCarryall_Cargo)
 	{
-		auto const pCargo = abstract_cast<FootClass*>(pUnit->AttachTrigger);
-		if (pCargo)
-		{
-			// Get drop location
-			CoordStruct dropCoord = pUnit->Location;
-			dropCoord.Z = 0; // Drop to ground
+		auto const pCargo = pUnitExt->JumpjetCarryall_Cargo;
 
-			// Detach cargo
-			pUnit->AttachTrigger = nullptr;
-			pCargo->BunkerLinkedItem = nullptr;
+		// Get drop location
+		CoordStruct dropCoord = pUnit->Location;
+		dropCoord.Z = 0; // Drop to ground
 
-			// Place cargo on map (might take falling damage)
-			++Unsorted::IKnowWhatImDoing;
-			pCargo->Unlimbo(dropCoord, DirType::North);
-			--Unsorted::IKnowWhatImDoing;
+		// Detach cargo
+		pUnitExt->JumpjetCarryall_Cargo = nullptr;
+		FootExt::Fetch(pCargo)->JumpjetCarryall_Carrier = nullptr;
 
-			pCargo->Transporter = nullptr;
-		}
+		// Place cargo on map (might take falling damage)
+		++Unsorted::ScenarioInit;
+		pCargo->Unlimbo(dropCoord, DirType::North);
+		--Unsorted::ScenarioInit;
+
+		pCargo->Transporter = nullptr;
 	}
 
 	return 0;

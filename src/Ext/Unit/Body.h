@@ -26,6 +26,8 @@ public:
 	std::vector<RecoilData> ExtraTurretRecoil;
 	std::vector<RecoilData> ExtraBarrelRecoil;
 
+	FootClass* JumpjetCarryall_Cargo; // The unit currently being carried, if this is a jumpjet carryall.
+
 	explicit UnitExt(UnitClass* const OwnerObject) : FootExt(OwnerObject)
 		, SubterraneanHarvStatus { 0 }
 		, SubterraneanHarvRallyPoint { nullptr }
@@ -37,6 +39,7 @@ public:
 		, UndergroundTracked { false }
 		, ExtraTurretRecoil {}
 		, ExtraBarrelRecoil {}
+		, JumpjetCarryall_Cargo { nullptr }
 	{ }
 
 	virtual ~UnitExt() override;

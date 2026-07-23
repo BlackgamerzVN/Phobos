@@ -33,6 +33,7 @@ void UnitExt::Serialize(T& Stm)
 		.Process(this->UndergroundTracked)
 		.Process(this->ExtraTurretRecoil)
 		.Process(this->ExtraBarrelRecoil)
+		.Process(this->JumpjetCarryall_Cargo)
 		;
 }
 
