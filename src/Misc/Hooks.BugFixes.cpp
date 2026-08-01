@@ -1265,6 +1265,15 @@ DEFINE_HOOK(0x4C75DA, EventClass_RespondToEvent_Stop, 0x6)
 	// Stop any enter action
 	pTechno->QueueUpToEnter = nullptr;
 
+	// Stop any running jumpjet carryall pickup. Stop never reaches the click handlers, and
+	// once the carrier is over its target it looks exactly like a completed move, so this
+	// is the only place the order can be told apart from a normal arrival.
+	if (const auto pUnitExt = UnitExt::TryFetch(abstract_cast<UnitClass*>(pTechno)))
+	{
+		if (pUnitExt->JumpjetCarryall_State >= JumpjetCarryallState::Approach)
+			pUnitExt->CancelJumpjetCarryallMission(true);
+	}
+
 	if (commonAircraft)
 	{
 		pAircraft->SetArchiveTarget(nullptr);

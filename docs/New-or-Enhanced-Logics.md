@@ -2537,7 +2537,8 @@ FireUp.ResetInRetarget=true     ; boolean
 
 - Vehicles that use the jumpjet locomotor can now act as carryalls, slinging a single ground unit underneath themselves. Set `JumpjetCarryall=yes` on the carrier and it gains a tote cursor over eligible units: click one and the carrier flies over, lowers itself onto the unit, secures it, and carries it away. Use the deploy/unload command to set the cargo back down.
 - The cargo is released where the carrier is, then comes down on its own: a jumpjet flies itself down, anything else falls like a paradropped unit. If the cell below is blocked the closest free one is used instead, and if there is nowhere to put the cargo at all it stays slung.
-- Unlike aircraft carryalls the carrier keeps its normal jumpjet movement, weapons and missions the whole time, and it never has to land.
+- Unlike aircraft carryalls the carrier keeps its normal jumpjet movement, weapons and missions the whole time.
+- Both `BalloonHover` modes are supported. A `BalloonHover=yes` carrier lowers itself onto the unit and climbs back to `JumpjetHeight` once it has it, never landing. A `BalloonHover=no` carrier lands on the unit to pick it up and then parks there with the cargo, exactly as it would park without one, and takes off again the next time it is ordered somewhere.
   - `JumpjetCarryall.SizeLimit` is the largest `Size` the carrier can lift. `-1` means no limit. Defaults to [Ares' `Carryall.SizeLimit`](https://ares-developers.github.io/Ares-docs/new/carryalls.html) so existing carryall configurations keep working.
   - `JumpjetCarryall.AllowedTypes`, when set, restricts pickup to the listed TechnoTypes. `JumpjetCarryall.DisallowedTypes` always blocks the listed ones and is checked first.
   - `JumpjetCarryall.AllowInfantry` and `JumpjetCarryall.AllowVehicles` control which categories can be lifted at all.
@@ -2549,6 +2550,7 @@ FireUp.ResetInRetarget=true     ; boolean
 - On the cargo side, `JumpjetCarryall.Allowed` decides whether a unit may be lifted at all. It defaults to Ares' `Carryall.Allowed`, so units already excluded from aircraft carryalls stay excluded here.
 - `JumpjetCarryall.Offset` is where the cargo is drawn relative to the carrier, given as Forward,Lateral,Height like any other FLH. It rotates with the carrier's facing, so use a negative Height to hang the cargo below.
 - A slung unit is in limbo: it cannot move, fire or be targeted, and it is drawn under the carrier by Phobos itself.
+- A pickup has no range limit, but the carrier gives up if it spends too long without getting any closer to its target - for instance when the target is unreachable or keeps running away.
 
 ```{note}
 Only one unit can be slung at a time. This is independent of `Passengers`, so a carrier can still have its own passenger bays.

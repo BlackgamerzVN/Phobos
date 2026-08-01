@@ -29,6 +29,48 @@ namespace
 		return pThis->Type->JumpjetHeight;
 	}
 
+	// Frame budget for a phase that waits on the locomotor to change the carrier's
+	// altitude, sized from the rate that phase actually runs at. Generous multiple of
+	// the ideal time so that a slow jumpjet is never cut short, while a carrier that
+	// physically cannot get where it needs to go still gives up.
+	int GetHeightChangeBudget(UnitClass* pThis, double rate)
+	{
+		const int height = Math::max(GetCruiseHeight(pThis), Unsorted::LevelHeight);
+
+		return static_cast<int>(height / Math::max(rate, 0.05)) * 4 + 150;
+	}
+
+	// Rate the carrier actually lowers itself at, which JumpjetCarryall.DescendRate is
+	// free to make much slower than JumpjetClimb. Kept fractional so that a jumpjet with
+	// a sub-1 JumpjetClimb is not budgeted as if it climbed a whole lepton per frame.
+	double GetDescendRate(UnitClass* pThis, UnitTypeExt* pTypeExt)
+	{
+		const int rate = pTypeExt->JumpjetCarryall_DescendRate;
+
+		return rate > 0 ? static_cast<double>(rate) : static_cast<double>(pThis->Type->JumpjetClimb);
+	}
+
+	// Frame budget for the flight to the target's cell. This is a no-progress allowance,
+	// not a total flight time: it only runs down while the carrier fails to get any
+	// closer, so the range of a pickup is not capped.
+	constexpr int StallBudget = 450;
+
+	// Budget for a whole pickup. Approach and descend share it, because the carrier can
+	// bounce between those two phases as the target shuffles around underneath it and a
+	// per-phase budget would then never run out.
+	int GetPickupBudget(UnitClass* pThis, UnitTypeExt* pTypeExt)
+	{
+		return StallBudget + GetHeightChangeBudget(pThis, GetDescendRate(pThis, pTypeExt));
+	}
+
+	int GetCellDistance(const CellStruct& a, const CellStruct& b)
+	{
+		const int dx = a.X - b.X;
+		const int dy = a.Y - b.Y;
+
+		return Math::max(dx < 0 ? -dx : dx, dy < 0 ? -dy : dy);
+	}
+
 	bool IsListed(const std::vector<TechnoTypeClass*>& list, TechnoTypeClass* pType)
 	{
 		return std::find(list.begin(), list.end(), pType) != list.end();
@@ -45,8 +87,23 @@ bool UnitExt::IsJumpjetCarryall() const
 	return locomotion_cast<JumpjetLocomotionClass*>(pThis->Locomotor) != nullptr;
 }
 
-double UnitExt::GetJumpjetCarryallSpeedMultiplier() const
+bool UnitExt::IsJumpjetCarryallLandingOnTarget() const
 {
+	// Approach counts too: the state machine runs after the locomotor, so it is always a
+	// frame behind, and a pickup ordered on a unit already sharing the carrier's cell can
+	// reach the locomotor's descent before the state flips to Descend.
+	if (this->JumpjetCarryall_State != JumpjetCarryallState::Descend
+		&& this->JumpjetCarryall_State != JumpjetCarryallState::Approach)
+	{
+		return false;
+	}
+
+	auto const pTarget = this->JumpjetCarryall_Target;
+
+	return pTarget && this->OwnerObject()->GetMapCoords() == pTarget->GetMapCoords();
+}
+
+double UnitExt::GetJumpjetCarryallSpeedMultiplier() const{
 	if (!this->JumpjetCarryall_Payload)
 		return 1.0;
 
@@ -127,6 +184,27 @@ bool UnitExt::CanLiftJumpjetCargo(TechnoClass* pTarget) const
 	return true;
 }
 
+bool UnitExt::TickJumpjetCarryallPickup()
+{
+	auto const pThis = this->OwnerObject();
+	auto const pTypeExt = this->GetTypeExtData();
+
+	// The watchdog measures lack of progress, not elapsed time, so a pickup ordered across
+	// the whole map is fine as long as the carrier keeps closing in. Only a strictly new
+	// record counts: a target jittering back and forth must not keep resetting the clock.
+	const int distance = GetCellDistance(pThis->GetMapCoords(), this->JumpjetCarryall_TargetCell);
+
+	if (distance < this->JumpjetCarryall_BestDistance)
+	{
+		this->JumpjetCarryall_BestDistance = distance;
+		this->JumpjetCarryall_Timer = 0;
+
+		return true;
+	}
+
+	return ++this->JumpjetCarryall_Timer <= GetPickupBudget(pThis, pTypeExt);
+}
+
 void UnitExt::StartJumpjetCarryallMission(FootClass* pTarget)
 {
 	auto const pThis = this->OwnerObject();
@@ -146,6 +224,8 @@ void UnitExt::StartJumpjetCarryallMission(FootClass* pTarget)
 	this->JumpjetCarryall_Target = pTarget;
 	this->JumpjetCarryall_TargetCell = pCell->MapCoords;
 	this->JumpjetCarryall_State = JumpjetCarryallState::Approach;
+	this->JumpjetCarryall_Timer = 0;
+	this->JumpjetCarryall_BestDistance = INT_MAX;
 	FootExt::Fetch(pTarget)->JumpjetCarryall_TargetedBy = pThis;
 
 	pThis->SetTarget(nullptr);
@@ -168,6 +248,8 @@ void UnitExt::CancelJumpjetCarryallMission(bool keepReady)
 	this->JumpjetCarryall_Target = nullptr;
 	this->JumpjetCarryall_TargetCell = CellStruct::Empty;
 	this->JumpjetCarryall_State = keepReady ? JumpjetCarryallState::Ready : JumpjetCarryallState::Inactive;
+	this->JumpjetCarryall_Timer = 0;
+	this->JumpjetCarryall_BestDistance = INT_MAX;
 
 	// Hand the cruise height back to the locomotor.
 	if (auto const pJJLoco = locomotion_cast<JumpjetLocomotionClass*>(pThis->Locomotor))
@@ -248,7 +330,7 @@ void UnitExt::UpdateJumpjetCarryall()
 	{
 		auto const pTarget = this->JumpjetCarryall_Target;
 
-		if (!this->CanLiftJumpjetCargo(pTarget))
+		if (!this->CanLiftJumpjetCargo(pTarget) || !this->TickJumpjetCarryallPickup())
 		{
 			this->CancelJumpjetCarryallMission(true);
 			break;
@@ -262,22 +344,30 @@ void UnitExt::UpdateJumpjetCarryall()
 			break;
 		}
 
+		if (pThis->GetMapCoords() == pCell->MapCoords)
+		{
+			this->JumpjetCarryall_State = JumpjetCarryallState::Descend;
+			break;
+		}
+
 		// Chase the target if it walks off to another cell.
 		if (pCell->MapCoords != this->JumpjetCarryall_TargetCell)
 		{
 			this->JumpjetCarryall_TargetCell = pCell->MapCoords;
 			pThis->SetDestination(pCell, true);
 			pThis->QueueMission(Mission::Move, true);
-		}
-		else if (pThis->Destination && pThis->Destination != pCell)
-		{
-			// Something else sent the carrier somewhere - the player took over.
-			this->CancelJumpjetCarryallMission(true);
 			break;
 		}
 
-		if (pThis->GetMapCoords() == pCell->MapCoords)
-			this->JumpjetCarryall_State = JumpjetCarryallState::Descend;
+		// Stop flying the pickup the moment the carrier is no longer flying it: the player
+		// redirected it, or the engine gave up on the destination. Holding on would keep
+		// the target off limits to every other carryall.
+		const bool stillOnTask = pThis->Destination
+			? pThis->Destination == pCell
+			: pThis->CurrentMission == Mission::Move;
+
+		if (!stillOnTask)
+			this->CancelJumpjetCarryallMission(true);
 
 		break;
 	}
@@ -286,7 +376,7 @@ void UnitExt::UpdateJumpjetCarryall()
 	{
 		auto const pTarget = this->JumpjetCarryall_Target;
 
-		if (!this->CanLiftJumpjetCargo(pTarget))
+		if (!this->CanLiftJumpjetCargo(pTarget) || !this->TickJumpjetCarryallPickup())
 		{
 			this->CancelJumpjetCarryallMission(true);
 			break;
@@ -301,7 +391,8 @@ void UnitExt::UpdateJumpjetCarryall()
 			break;
 		}
 
-		// Something else sent the carrier somewhere - the player took over.
+		// Something else sent the carrier somewhere - the player took over. A null
+		// destination is not a takeover here: arriving over the target clears it.
 		if (pThis->Destination
 			&& CellClass::Coord2Cell(pThis->Destination->GetCoords()) != this->JumpjetCarryall_TargetCell)
 		{
@@ -344,17 +435,34 @@ void UnitExt::UpdateJumpjetCarryall()
 		pJJLoco->Climb = static_cast<float>(pThis->Type->JumpjetClimb);
 		pJJLoco->CurrentHeight = GetCruiseHeight(pThis);
 		this->JumpjetCarryall_State = JumpjetCarryallState::Ascend;
+		this->JumpjetCarryall_Timer = 0;
+		this->JumpjetCarryall_BestDistance = INT_MAX;
 
 		break;
 	}
 
 	case JumpjetCarryallState::Ascend:
 	{
+		// A jumpjet that does not hover when idle has nothing to climb back to: it parks
+		// itself on the ground exactly like it would without any cargo, and takes off
+		// again with the cargo the next time it is given somewhere to go. Forcing a
+		// cruise height on it here would only fight the locomotor's own landing.
+		if (!pThis->Type->BalloonHover && !pThis->Destination
+			&& pJJLoco->State == JumpjetLocomotionClass::State::Grounded)
+		{
+			this->JumpjetCarryall_State = JumpjetCarryallState::Inactive;
+			break;
+		}
+
 		const int cruiseHeight = GetCruiseHeight(pThis);
 		pJJLoco->CurrentHeight = cruiseHeight;
 
-		if (pThis->GetHeight() >= cruiseHeight - Unsorted::LevelHeight)
+		if (pThis->GetHeight() >= cruiseHeight - Unsorted::LevelHeight
+			|| ++this->JumpjetCarryall_Timer
+				> GetHeightChangeBudget(pThis, pThis->Type->JumpjetClimb))
+		{
 			this->JumpjetCarryall_State = JumpjetCarryallState::Inactive;
+		}
 
 		break;
 	}

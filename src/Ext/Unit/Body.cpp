@@ -60,6 +60,8 @@ void UnitExt::Serialize(T& Stm)
 		.Process(this->JumpjetCarryall_Target)
 		.Process(this->JumpjetCarryall_TargetCell)
 		.Process(this->JumpjetCarryall_State)
+		.Process(this->JumpjetCarryall_Timer)
+		.Process(this->JumpjetCarryall_BestDistance)
 		;
 }
 
