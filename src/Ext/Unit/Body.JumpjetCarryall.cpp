@@ -350,17 +350,21 @@ void UnitExt::UpdateJumpjetCarryall()
 			break;
 		}
 
-		// Keep the carrier aimed at the target's cell: chase the target when it walks off,
-		// and re-issue an order the engine dropped or relocated, which it readily does for
-		// a cell it considers unreachable - and an occupied cell normally is one. This is
-		// not a way for the player to call the pickup off; that is handled explicitly by
-		// the click and stop hooks, so re-issuing cannot make a carrier unstoppable. A
-		// carrier that genuinely cannot get there is caught by the watchdog above.
-		if (pCell->MapCoords != this->JumpjetCarryall_TargetCell || pThis->Destination != pCell)
+		// Keep the carrier aimed at the target's cell. A dropped destination is not the
+		// player calling the pickup off - the engine readily drops one it considers
+		// unreachable, and an occupied cell normally is one - so the order is re-issued.
+		// A destination pointing somewhere else is someone else's order, and the carrier
+		// is handed over to it: a right click on open ground goes through
+		// CellClickedAction, which the carryall click hook does not see.
+		if (pCell->MapCoords != this->JumpjetCarryall_TargetCell || !pThis->Destination)
 		{
 			this->JumpjetCarryall_TargetCell = pCell->MapCoords;
 			pThis->SetDestination(pCell, true);
 			pThis->QueueMission(Mission::Move, true);
+		}
+		else if (pThis->Destination != pCell)
+		{
+			this->CancelJumpjetCarryallMission(true);
 		}
 
 		break;
@@ -382,6 +386,15 @@ void UnitExt::UpdateJumpjetCarryall()
 			pJJLoco->CurrentHeight = GetCruiseHeight(pThis);
 			pJJLoco->Climb = static_cast<float>(pThis->Type->JumpjetClimb);
 			this->JumpjetCarryall_State = JumpjetCarryallState::Approach;
+			break;
+		}
+
+		// Someone else sent the carrier somewhere - hand it over. A null destination is
+		// not a takeover here: arriving over the target clears it.
+		if (pThis->Destination
+			&& CellClass::Coord2Cell(pThis->Destination->GetCoords()) != this->JumpjetCarryall_TargetCell)
+		{
+			this->CancelJumpjetCarryallMission(true);
 			break;
 		}
 

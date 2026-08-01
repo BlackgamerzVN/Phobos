@@ -2,6 +2,19 @@
 
 UnitTypeExt::ExtContainer UnitTypeExt::ExtMap;
 
+bool UnitTypeExt::IsJumpjetCarryallInUse()
+{
+	for (auto const pType : UnitTypeClass::Array)
+	{
+		auto const pExt = UnitTypeExt::TryFetch(pType);
+
+		if (pExt && pExt->JumpjetCarryall)
+			return true;
+	}
+
+	return false;
+}
+
 void UnitTypeExt::ApplyTurretOffsetUnit(Matrix3D* mtx, double factor, int turIdx)
 {
 	// Does not verify if the offset actually has all values parsed as it makes no difference, it will be 0 for the unparsed ones either way.

@@ -195,6 +195,10 @@ public:
 		return AbstractExt::TryFetch<UnitTypeExt>(pThis);
 	}
 
+	// Whether any loaded UnitType is a jumpjet carryall, i.e. whether the feature's hooks
+	// have to survive the optimization pass.
+	static bool IsJumpjetCarryallInUse();
+
 	virtual void LoadFromINIFile(CCINIClass* pINI) override;
 	virtual void LoadFromStream(PhobosStreamReader& Stm) override;
 	virtual void SaveToStream(PhobosStreamWriter& Stm) override;
