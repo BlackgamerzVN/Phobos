@@ -2533,45 +2533,46 @@ FireUp=                         ; integer
 FireUp.ResetInRetarget=true     ; boolean
 ```
 
-### Jumpjet Vehicle Carryall System
+### Jumpjet vehicle carryall
 
-![Jumpjet Carryall](_static/images/jumpjet-carryall-example.png)
-*Jumpjet vehicle carrying units (example)*
-
-- Allows jumpjet vehicles (particularly those with `BalloonHover=yes`) to act as carryalls, picking up and transporting infantry or other vehicles.
-- This system is vehicle-specific and complements the existing aircraft carryall functionality with additional features tailored to jumpjet locomotor behavior.
-  - `JumpjetCarryall` enables the carryall functionality for the vehicle. Must be a jumpjet vehicle (`JumpJet=yes`).
-  - `JumpjetCarryall.SizeLimit` controls the maximum `Size=` of units that can be picked up. Use `-1` to allow any size. This is compatible with [Ares' `Carryall.SizeLimit`](https://ares-developers.github.io/Ares-docs/new/carryalls.html) system.
-  - `JumpjetCarryall.Types` can be used to restrict pickup to specific unit/infantry types. If not set or empty, any eligible unit can be picked up (subject to other filters).
-  - `JumpjetCarryall.AllowInfantry` and `JumpjetCarryall.AllowVehicles` control whether infantry and vehicles can be carried, respectively.
-  - `JumpjetCarryall.Capacity` sets the maximum number of units that can be carried simultaneously. Currently only `1` is supported.
-  - `JumpjetCarryall.PickupRange` sets the maximum distance (in leptons) for picking up units. Defaults to 256 leptons (~1 cell).
-  - `JumpjetCarryall.SpeedMultiplier` applies a speed penalty when carrying cargo. For example, `0.8` means 20% slower.
-  - `JumpjetCarryall.VoicePickup` and `JumpjetCarryall.VoiceDropoff` set custom voice lines for pickup and dropoff actions.
-  - `JumpjetCarryall.DrawCargo` (not yet implemented) would enable visual rendering of cargo beneath the carrier.
-  - `JumpjetCarryall.CargoOffset` (not yet implemented) would control the visual offset for cargo rendering.
-- Cargo is automatically released if the carrier dies, and dropped units are placed at the carrier's position.
-- Filters are applied in this order: infantry/vehicle type check → `AllowInfantry`/`AllowVehicles` → `SizeLimit` → `Types` whitelist → other restrictions (water, height, mind control, etc.).
+- Vehicles that use the jumpjet locomotor can now act as carryalls, slinging a single ground unit underneath themselves. Set `JumpjetCarryall=yes` on the carrier and it gains a tote cursor over eligible units: click one and the carrier flies over, lowers itself onto the unit, secures it, and carries it away. Use the deploy/unload command to set the cargo back down.
+- The cargo is released where the carrier is, then comes down on its own: a jumpjet flies itself down, anything else falls like a paradropped unit. If the cell below is blocked the closest free one is used instead, and if there is nowhere to put the cargo at all it stays slung.
+- Unlike aircraft carryalls the carrier keeps its normal jumpjet movement, weapons and missions the whole time, and it never has to land.
+  - `JumpjetCarryall.SizeLimit` is the largest `Size` the carrier can lift. `-1` means no limit. Defaults to [Ares' `Carryall.SizeLimit`](https://ares-developers.github.io/Ares-docs/new/carryalls.html) so existing carryall configurations keep working.
+  - `JumpjetCarryall.AllowedTypes`, when set, restricts pickup to the listed TechnoTypes. `JumpjetCarryall.DisallowedTypes` always blocks the listed ones and is checked first.
+  - `JumpjetCarryall.AllowInfantry` and `JumpjetCarryall.AllowVehicles` control which categories can be lifted at all.
+  - `JumpjetCarryall.AllowAllied` controls whether allied units can be picked up. The carrier's own units are always allowed.
+  - `JumpjetCarryall.SpeedMultiplier` scales the carrier's speed while it is loaded. For example `0.8` makes it 20% slower. It stacks with every other speed modifier.
+  - `JumpjetCarryall.DescendRate` overrides `JumpjetClimb` while the carrier lowers itself onto a unit. `-1` keeps `JumpjetClimb`.
+  - `JumpjetCarryall.PickupSound` and `JumpjetCarryall.DropoffSound` are played when the cargo is secured and released. They default to `EnterTransportSound` and `LeaveTransportSound`.
+  - `JumpjetCarryall.ReleaseOnDeath` decides whether a destroyed carrier sets its cargo down. When set to `no` the cargo is destroyed with the carrier.
+- On the cargo side, `JumpjetCarryall.Allowed` decides whether a unit may be lifted at all. It defaults to Ares' `Carryall.Allowed`, so units already excluded from aircraft carryalls stay excluded here.
+- `JumpjetCarryall.Offset` is where the cargo is drawn relative to the carrier, given as Forward,Lateral,Height like any other FLH. It rotates with the carrier's facing, so use a negative Height to hang the cargo below.
+- A slung unit is in limbo: it cannot move, fire or be targeted, and it is drawn under the carrier by Phobos itself.
 
 ```{note}
-Jumpjet carryalls use a separate code path from aircraft carryalls, but both systems respect the vanilla `Size=` property and can work together in the same mod. The main differences from aircraft carryalls are: hover-based pickup/dropoff (no landing required), vehicle-specific restrictions (no water pickup), and expanded filtering options.
+Only one unit can be slung at a time. This is independent of `Passengers`, so a carrier can still have its own passenger bays.
 ```
 
 In `rulesmd.ini`:
 ```ini
-[SOMEVEHICLE]                               ; VehicleType, with JumpJet=yes
-JumpjetCarryall=false                       ; boolean
-JumpjetCarryall.SizeLimit=-1                ; integer, maximum Size that can be lifted (-1 for any)
-JumpjetCarryall.Types=                      ; List of TechnoTypes, specific types allowed (empty for all)
-JumpjetCarryall.AllowInfantry=true          ; boolean
-JumpjetCarryall.AllowVehicles=true          ; boolean
-JumpjetCarryall.Capacity=1                  ; integer, currently only 1 supported
-JumpjetCarryall.PickupRange=256             ; integer, leptons
-JumpjetCarryall.SpeedMultiplier=1.0         ; floating point value
-JumpjetCarryall.VoicePickup=                ; VocType, defaults to VoiceMove
-JumpjetCarryall.VoiceDropoff=               ; VocType
-JumpjetCarryall.DrawCargo=false             ; boolean (not yet implemented)
-JumpjetCarryall.CargoOffset=0,0,-128        ; integer - Forward,Lateral,Height (not yet implemented)
+[SOMEVEHICLE]                          ; VehicleType, with a Jumpjet locomotor
+JumpjetCarryall=false                  ; boolean
+JumpjetCarryall.SizeLimit=             ; integer, largest liftable Size, -1 for no limit, defaults to Carryall.SizeLimit
+JumpjetCarryall.AllowedTypes=          ; list of TechnoTypes, empty for no whitelist
+JumpjetCarryall.DisallowedTypes=       ; list of TechnoTypes
+JumpjetCarryall.AllowInfantry=true     ; boolean
+JumpjetCarryall.AllowVehicles=true     ; boolean
+JumpjetCarryall.AllowAllied=true       ; boolean
+JumpjetCarryall.SpeedMultiplier=1.0    ; floating point value
+JumpjetCarryall.DescendRate=-1         ; integer, -1 to use JumpjetClimb
+JumpjetCarryall.PickupSound=           ; sound entry, defaults to EnterTransportSound
+JumpjetCarryall.DropoffSound=          ; sound entry, defaults to LeaveTransportSound
+JumpjetCarryall.ReleaseOnDeath=true    ; boolean
+
+[SOMETECHNO]                           ; VehicleType or InfantryType that can be carried
+JumpjetCarryall.Allowed=               ; boolean, defaults to Carryall.Allowed
+JumpjetCarryall.Offset=0,0,0           ; integer - Forward,Lateral,Height
 ```
 
 ## Warheads

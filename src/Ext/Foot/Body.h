@@ -24,7 +24,8 @@ public:
 	bool ResetLocomotor;
 	bool JumpjetStraightAscend; // Is set to true jumpjet units will ascend straight and do not adjust rotation or position during it.
 	int AttackMoveFollowerTempCount;
-	UnitClass* JumpjetCarryall_Carrier; // Set while this unit is being carried by a jumpjet carryall vehicle.
+	UnitClass* JumpjetCarryall_Carrier; // Carrier slinging this unit, if any.
+	UnitClass* JumpjetCarryall_TargetedBy; // Carrier currently flying over to pick this unit up, if any.
 
 	explicit FootExt(FootClass* const OwnerObject) : TechnoExt(OwnerObject)
 		, LastKillWasTeamTarget { false }
@@ -41,6 +42,7 @@ public:
 		, JumpjetStraightAscend { false }
 		, AttackMoveFollowerTempCount { 0 }
 		, JumpjetCarryall_Carrier { nullptr }
+		, JumpjetCarryall_TargetedBy { nullptr }
 	{ }
 
 	FootClass* OwnerObject() const

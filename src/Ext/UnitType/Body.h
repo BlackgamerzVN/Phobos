@@ -83,19 +83,19 @@ public:
 	std::vector<CoordStruct> ExtraTurretOffsets;
 	Valueable<int> BurstPerTurret;
 
-	// Jumpjet Carryall system (vehicle-specific)
+	// Jumpjet carryall, carrier side (see TechnoTypeExt for the cargo side).
 	Valueable<bool> JumpjetCarryall;
-	ValueableVector<TechnoTypeClass*> JumpjetCarryall_CanLift;
-	Valueable<int> JumpjetCarryall_Capacity;
 	Valueable<int> JumpjetCarryall_SizeLimit;
-	NullableIdx<VocClass> JumpjetCarryall_VoicePickup;
-	NullableIdx<VocClass> JumpjetCarryall_VoiceDropoff;
-	Valueable<CoordStruct> JumpjetCarryall_CargoOffset;
-	Valueable<bool> JumpjetCarryall_DrawCargo;
-	Valueable<double> JumpjetCarryall_SpeedMultiplier;
-	Valueable<int> JumpjetCarryall_PickupRange;
+	ValueableVector<TechnoTypeClass*> JumpjetCarryall_AllowedTypes;
+	ValueableVector<TechnoTypeClass*> JumpjetCarryall_DisallowedTypes;
 	Valueable<bool> JumpjetCarryall_AllowInfantry;
 	Valueable<bool> JumpjetCarryall_AllowVehicles;
+	Valueable<bool> JumpjetCarryall_AllowAllied;
+	Valueable<double> JumpjetCarryall_SpeedMultiplier;
+	Valueable<int> JumpjetCarryall_DescendRate;
+	NullableIdx<VocClass> JumpjetCarryall_PickupSound;
+	NullableIdx<VocClass> JumpjetCarryall_DropoffSound;
+	Valueable<bool> JumpjetCarryall_ReleaseOnDeath;
 
 	explicit UnitTypeExt(UnitTypeClass* const OwnerObject) : TechnoTypeExt(OwnerObject)
 		, SinkSpeed { 5 }
@@ -158,17 +158,17 @@ public:
 		, ExtraTurretOffsets { }
 		, BurstPerTurret { 0 }
 		, JumpjetCarryall { false }
-		, JumpjetCarryall_CanLift {}
-		, JumpjetCarryall_Capacity { 1 }
 		, JumpjetCarryall_SizeLimit { -1 }
-		, JumpjetCarryall_VoicePickup {}
-		, JumpjetCarryall_VoiceDropoff {}
-		, JumpjetCarryall_CargoOffset { {0, 0, -128} }
-		, JumpjetCarryall_DrawCargo { false }
-		, JumpjetCarryall_SpeedMultiplier { 1.0 }
-		, JumpjetCarryall_PickupRange { 256 }
+		, JumpjetCarryall_AllowedTypes {}
+		, JumpjetCarryall_DisallowedTypes {}
 		, JumpjetCarryall_AllowInfantry { true }
 		, JumpjetCarryall_AllowVehicles { true }
+		, JumpjetCarryall_AllowAllied { true }
+		, JumpjetCarryall_SpeedMultiplier { 1.0 }
+		, JumpjetCarryall_DescendRate { -1 }
+		, JumpjetCarryall_PickupSound {}
+		, JumpjetCarryall_DropoffSound {}
+		, JumpjetCarryall_ReleaseOnDeath { true }
 	{ }
 
 	UnitTypeClass* OwnerObject() const

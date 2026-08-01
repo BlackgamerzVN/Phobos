@@ -282,6 +282,10 @@ public:
 	Nullable<bool> NoQueueUpToUnload;
 	Valueable<bool> Passengers_BySize;
 
+	// Jumpjet carryall, cargo side (see UnitTypeExt for the carrier side).
+	Nullable<bool> JumpjetCarryall_Allowed;
+	Valueable<CoordStruct> JumpjetCarryall_Offset;
+
 	Valueable<int> RateDown_Delay;
 	Valueable<bool> RateDown_Reset;
 	Valueable<int> RateDown_Cover_Value;
@@ -668,6 +672,8 @@ public:
 		, NoQueueUpToEnter_BoardDistance {}
 		, NoQueueUpToUnload {}
 		, Passengers_BySize { true }
+		, JumpjetCarryall_Allowed {}
+		, JumpjetCarryall_Offset { { 0, 0, 0 } }
 
 		, RateDown_Delay { 0 }
 		, RateDown_Reset { false }

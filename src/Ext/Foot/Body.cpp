@@ -836,6 +836,7 @@ void FootExt::Serialize(T& Stm)
 		.Process(this->JumpjetStraightAscend)
 		.Process(this->AttackMoveFollowerTempCount)
 		.Process(this->JumpjetCarryall_Carrier)
+		.Process(this->JumpjetCarryall_TargetedBy)
 		;
 }
 

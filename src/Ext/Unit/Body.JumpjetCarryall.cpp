@@ -1,0 +1,505 @@
+#include "Body.h"
+
+#include <JumpjetLocomotionClass.h>
+
+#include <Ext/Techno/Body.h>
+#include <Ext/TechnoType/Body.h>
+
+// Jumpjet carryall.
+//
+// A VehicleType that uses the jumpjet locomotor and sets JumpjetCarryall=yes can
+// sling a single ground unit underneath itself, the same way a vanilla aircraft
+// carryall does. The player targets a unit with the Tote cursor, the carrier flies
+// over it, lowers itself onto it, secures it, and releases it again with the
+// deploy/unload command.
+//
+// The whole mission is driven from UnitClass::AI, so the carrier keeps its normal
+// jumpjet movement, weapons and mission handling while the pickup runs. Descending
+// and climbing are done by handing a new target height to the jumpjet locomotor
+// rather than by moving the carrier by hand, which keeps the engine in charge of
+// the actual flight.
+
+namespace
+{
+	// Height (in leptons) below which the sling can reach a grounded unit.
+	constexpr int PickupReachHeight = Unsorted::LevelHeight;
+
+	int GetCruiseHeight(UnitClass* pThis)
+	{
+		return pThis->Type->JumpjetHeight;
+	}
+
+	bool IsListed(const std::vector<TechnoTypeClass*>& list, TechnoTypeClass* pType)
+	{
+		return std::find(list.begin(), list.end(), pType) != list.end();
+	}
+}
+
+bool UnitExt::IsJumpjetCarryall() const
+{
+	auto const pThis = this->OwnerObject();
+
+	if (!this->GetTypeExtData()->JumpjetCarryall)
+		return false;
+
+	return locomotion_cast<JumpjetLocomotionClass*>(pThis->Locomotor) != nullptr;
+}
+
+double UnitExt::GetJumpjetCarryallSpeedMultiplier() const
+{
+	if (!this->JumpjetCarryall_Payload)
+		return 1.0;
+
+	return this->GetTypeExtData()->JumpjetCarryall_SpeedMultiplier;
+}
+
+bool UnitExt::CanLiftJumpjetCargo(TechnoClass* pTarget) const
+{
+	auto const pThis = this->OwnerObject();
+
+	if (!pTarget || pTarget == pThis || this->JumpjetCarryall_Payload || !this->IsJumpjetCarryall())
+		return false;
+
+	auto const pTargetFoot = abstract_cast<FootClass*>(pTarget);
+
+	if (!pTargetFoot || !pTargetFoot->IsAlive || pTargetFoot->InLimbo || pTargetFoot->IsInAir())
+		return false;
+
+	// A unit can only hang under one carrier, and one already inside a transport is off limits.
+	if (pTargetFoot->Transporter || FootExt::Fetch(pTargetFoot)->JumpjetCarryall_Carrier)
+		return false;
+
+	// Two carriers must not race for the same unit.
+	auto const pClaimedBy = FootExt::Fetch(pTargetFoot)->JumpjetCarryall_TargetedBy;
+
+	if (pClaimedBy && pClaimedBy != pThis)
+		return false;
+
+	// Anything that pins the target down also blocks a pickup.
+	if (pTargetFoot->ParasiteEatingMe || pTargetFoot->IsIronCurtained() || pTargetFoot->WarpingOut
+		|| pTargetFoot->BeingWarpedOut || pTargetFoot->IsImmobilized || pTargetFoot->IsAttackedByLocomotor)
+		return false;
+
+	auto const pTypeExt = this->GetTypeExtData();
+
+	switch (pTargetFoot->WhatAmI())
+	{
+	case AbstractType::Infantry:
+		if (!pTypeExt->JumpjetCarryall_AllowInfantry)
+			return false;
+		break;
+
+	case AbstractType::Unit:
+		if (!pTypeExt->JumpjetCarryall_AllowVehicles)
+			return false;
+		break;
+
+	default:
+		return false;
+	}
+
+	// Own units are always fair game, allied ones only when the carrier allows it.
+	if (pThis->Owner != pTargetFoot->Owner
+		&& !(pTypeExt->JumpjetCarryall_AllowAllied && pThis->Owner->IsAlliedWith(pTargetFoot->Owner)))
+	{
+		return false;
+	}
+
+	auto const pTargetType = pTargetFoot->GetTechnoType();
+
+	if (!TechnoTypeExt::Fetch(pTargetType)->JumpjetCarryall_Allowed.Get(true))
+		return false;
+
+	const int sizeLimit = pTypeExt->JumpjetCarryall_SizeLimit;
+
+	if (sizeLimit >= 0 && pTargetType->Size > sizeLimit)
+		return false;
+
+	if (IsListed(pTypeExt->JumpjetCarryall_DisallowedTypes, pTargetType))
+		return false;
+
+	if (!pTypeExt->JumpjetCarryall_AllowedTypes.empty()
+		&& !IsListed(pTypeExt->JumpjetCarryall_AllowedTypes, pTargetType))
+	{
+		return false;
+	}
+
+	return true;
+}
+
+void UnitExt::StartJumpjetCarryallMission(FootClass* pTarget)
+{
+	auto const pThis = this->OwnerObject();
+
+	if (!this->CanLiftJumpjetCargo(pTarget))
+		return;
+
+	auto const pCell = MapClass::Instance.TryGetCellAt(pTarget->GetCoords());
+
+	if (!pCell)
+		return;
+
+	// Drop the claim on whatever the carrier was after before, or that unit stays
+	// permanently off limits to every other carryall.
+	this->CancelJumpjetCarryallMission(true);
+
+	this->JumpjetCarryall_Target = pTarget;
+	this->JumpjetCarryall_TargetCell = pCell->MapCoords;
+	this->JumpjetCarryall_State = JumpjetCarryallState::Approach;
+	FootExt::Fetch(pTarget)->JumpjetCarryall_TargetedBy = pThis;
+
+	pThis->SetTarget(nullptr);
+	pThis->SetDestination(pCell, true);
+	pThis->QueueMission(Mission::Move, true);
+}
+
+void UnitExt::CancelJumpjetCarryallMission(bool keepReady)
+{
+	auto const pThis = this->OwnerObject();
+
+	if (auto const pTarget = this->JumpjetCarryall_Target)
+	{
+		auto const pTargetExt = FootExt::TryFetch(pTarget);
+
+		if (pTargetExt && pTargetExt->JumpjetCarryall_TargetedBy == pThis)
+			pTargetExt->JumpjetCarryall_TargetedBy = nullptr;
+	}
+
+	this->JumpjetCarryall_Target = nullptr;
+	this->JumpjetCarryall_TargetCell = CellStruct::Empty;
+	this->JumpjetCarryall_State = keepReady ? JumpjetCarryallState::Ready : JumpjetCarryallState::Inactive;
+
+	// Hand the cruise height back to the locomotor.
+	if (auto const pJJLoco = locomotion_cast<JumpjetLocomotionClass*>(pThis->Locomotor))
+	{
+		pJJLoco->CurrentHeight = GetCruiseHeight(pThis);
+		pJJLoco->Climb = static_cast<float>(pThis->Type->JumpjetClimb);
+	}
+}
+
+void UnitExt::UpdateJumpjetCarryall()
+{
+	auto const pThis = this->OwnerObject();
+
+	if (!this->IsJumpjetCarryall())
+	{
+		// The locomotor may have been swapped out from under a loaded carrier.
+		if (this->JumpjetCarryall_Payload)
+			this->DropJumpjetCarryallPayload();
+
+		return;
+	}
+
+	auto const pJJLoco = locomotion_cast<JumpjetLocomotionClass*>(pThis->Locomotor);
+	auto const pTypeExt = this->GetTypeExtData();
+
+	// Keep the slung unit glued to the carrier.
+	if (auto const pPayload = this->JumpjetCarryall_Payload)
+	{
+		if (!pPayload->IsAlive)
+		{
+			this->JumpjetCarryall_Payload = nullptr;
+		}
+		else
+		{
+			// Limbo() is what keeps the payload off the map; re-apply it if anything undid it.
+			if (!pPayload->InLimbo)
+				pPayload->Limbo();
+
+			pPayload->SetLocation(pThis->Location);
+			pPayload->OnBridge = false;
+			pPayload->IsOnCarryall = true;
+
+			const auto facing = pThis->PrimaryFacing.Current();
+			pPayload->PrimaryFacing.SetCurrent(facing);
+			pPayload->SecondaryFacing.SetCurrent(facing);
+
+			if (auto const pPayloadLoco = locomotion_cast<JumpjetLocomotionClass*>(pPayload->Locomotor))
+				pPayloadLoco->LocomotionFacing.SetCurrent(facing);
+		}
+	}
+
+	// Carrying something slows the carrier down. That factor is folded into
+	// TechnoExt::GetCurrentSpeedMultiplier so it composes with every other speed modifier
+	// instead of fighting the locomotor over the raw speed value.
+
+	if (!pThis->IsAlive || pThis->InLimbo)
+		return;
+
+	switch (this->JumpjetCarryall_State)
+	{
+	case JumpjetCarryallState::Inactive:
+	{
+		if (!this->JumpjetCarryall_Payload && pThis->IsInAir())
+			this->JumpjetCarryall_State = JumpjetCarryallState::Ready;
+
+		break;
+	}
+
+	case JumpjetCarryallState::Ready:
+	{
+		if (this->JumpjetCarryall_Payload || !pThis->IsInAir())
+			this->JumpjetCarryall_State = JumpjetCarryallState::Inactive;
+
+		break;
+	}
+
+	case JumpjetCarryallState::Approach:
+	{
+		auto const pTarget = this->JumpjetCarryall_Target;
+
+		if (!this->CanLiftJumpjetCargo(pTarget))
+		{
+			this->CancelJumpjetCarryallMission(true);
+			break;
+		}
+
+		auto const pCell = MapClass::Instance.TryGetCellAt(pTarget->GetCoords());
+
+		if (!pCell)
+		{
+			this->CancelJumpjetCarryallMission(true);
+			break;
+		}
+
+		// Chase the target if it walks off to another cell.
+		if (pCell->MapCoords != this->JumpjetCarryall_TargetCell)
+		{
+			this->JumpjetCarryall_TargetCell = pCell->MapCoords;
+			pThis->SetDestination(pCell, true);
+			pThis->QueueMission(Mission::Move, true);
+		}
+		else if (pThis->Destination && pThis->Destination != pCell)
+		{
+			// Something else sent the carrier somewhere - the player took over.
+			this->CancelJumpjetCarryallMission(true);
+			break;
+		}
+
+		if (pThis->GetMapCoords() == pCell->MapCoords)
+			this->JumpjetCarryall_State = JumpjetCarryallState::Descend;
+
+		break;
+	}
+
+	case JumpjetCarryallState::Descend:
+	{
+		auto const pTarget = this->JumpjetCarryall_Target;
+
+		if (!this->CanLiftJumpjetCargo(pTarget))
+		{
+			this->CancelJumpjetCarryallMission(true);
+			break;
+		}
+
+		// Target slipped out from under us: climb again and resume the chase.
+		if (pThis->GetMapCoords() != pTarget->GetMapCoords())
+		{
+			pJJLoco->CurrentHeight = GetCruiseHeight(pThis);
+			pJJLoco->Climb = static_cast<float>(pThis->Type->JumpjetClimb);
+			this->JumpjetCarryall_State = JumpjetCarryallState::Approach;
+			break;
+		}
+
+		// Something else sent the carrier somewhere - the player took over.
+		if (pThis->Destination
+			&& CellClass::Coord2Cell(pThis->Destination->GetCoords()) != this->JumpjetCarryall_TargetCell)
+		{
+			this->CancelJumpjetCarryallMission(true);
+			break;
+		}
+
+		// Let the locomotor lower the carrier at its own rate.
+		const int descendRate = pTypeExt->JumpjetCarryall_DescendRate;
+
+		if (descendRate > 0)
+			pJJLoco->Climb = static_cast<float>(descendRate);
+
+		pJJLoco->CurrentHeight = 0;
+
+		if (pThis->GetHeight() > PickupReachHeight)
+			break;
+
+		// Close enough - sling the target.
+		auto const pTargetExt = FootExt::Fetch(pTarget);
+
+		pTarget->Deselect();
+		pTarget->Limbo();
+		pTarget->SetLocation(pThis->Location);
+		pTarget->OnBridge = false;
+		pTarget->IsOnCarryall = true;
+
+		this->JumpjetCarryall_Payload = pTarget;
+		pTargetExt->JumpjetCarryall_Carrier = pThis;
+		pTargetExt->JumpjetCarryall_TargetedBy = nullptr;
+
+		this->JumpjetCarryall_Target = nullptr;
+		this->JumpjetCarryall_TargetCell = CellStruct::Empty;
+
+		const int sound = pTypeExt->JumpjetCarryall_PickupSound.Get(pThis->Type->EnterTransportSound);
+
+		if (sound != -1)
+			VocClass::PlayAt(sound, pThis->Location);
+
+		pJJLoco->Climb = static_cast<float>(pThis->Type->JumpjetClimb);
+		pJJLoco->CurrentHeight = GetCruiseHeight(pThis);
+		this->JumpjetCarryall_State = JumpjetCarryallState::Ascend;
+
+		break;
+	}
+
+	case JumpjetCarryallState::Ascend:
+	{
+		const int cruiseHeight = GetCruiseHeight(pThis);
+		pJJLoco->CurrentHeight = cruiseHeight;
+
+		if (pThis->GetHeight() >= cruiseHeight - Unsorted::LevelHeight)
+			this->JumpjetCarryall_State = JumpjetCarryallState::Inactive;
+
+		break;
+	}
+	}
+}
+
+bool UnitExt::DropJumpjetCarryallPayload()
+{
+	auto const pThis = this->OwnerObject();
+	auto const pPayload = this->JumpjetCarryall_Payload;
+
+	if (!pPayload)
+		return false;
+
+	auto const pPayloadExt = FootExt::Fetch(pPayload);
+
+	this->JumpjetCarryall_Payload = nullptr;
+	pPayloadExt->JumpjetCarryall_Carrier = nullptr;
+	pPayload->IsOnCarryall = false;
+
+	this->CancelJumpjetCarryallMission();
+
+	if (!pPayload->IsAlive)
+		return false;
+
+	auto const pPayloadType = pPayload->GetTechnoType();
+	auto coords = pThis->Location;
+	auto pCell = MapClass::Instance.TryGetCellAt(coords);
+
+	const auto isClear = [pPayloadType](CellClass* pCell)
+		{
+			return pCell && pCell->IsClearToMove(pPayloadType->SpeedType, true, true, -1,
+				pPayloadType->MovementZone, pCell->GetLevel(), pCell->ContainsBridge());
+		};
+
+	// The cell right below is the natural drop spot; look for the closest usable one if it is taken.
+	if (!isClear(pCell))
+	{
+		const auto freeCell = MapClass::Instance.NearByLocation(CellClass::Coord2Cell(coords),
+			pPayloadType->SpeedType, -1, pPayloadType->MovementZone, false, 1, 1, false, false, false,
+			true, CellStruct::Empty, false, false);
+
+		if (freeCell != CellStruct::Empty)
+		{
+			if (auto const pFreeCell = MapClass::Instance.TryGetCellAt(freeCell))
+			{
+				const auto freeCoords = pFreeCell->GetCoords();
+				coords.X = freeCoords.X;
+				coords.Y = freeCoords.Y;
+				pCell = pFreeCell;
+			}
+		}
+	}
+
+	const bool onBridge = pCell && pCell->ContainsBridge();
+	const int floorHeight = MapClass::Instance.GetCellFloorHeight(coords) + (onBridge ? CellClass::BridgeHeight : 0);
+
+	// Release the cargo where the carrier is and let it come down by itself.
+	coords.Z = Math::max(coords.Z, floorHeight);
+	pPayload->OnBridge = onBridge;
+
+	const auto facing = pPayload->PrimaryFacing.Current().GetDir();
+
+	if (!pPayload->Unlimbo(coords, facing))
+	{
+		// Nowhere to put it down - keep it slung instead of destroying it.
+		pPayload->OnBridge = false;
+		this->JumpjetCarryall_Payload = pPayload;
+		pPayloadExt->JumpjetCarryall_Carrier = pThis;
+		pPayload->IsOnCarryall = true;
+		return false;
+	}
+
+	if (pPayload->IsInAir())
+	{
+		if (auto const pPayloadLoco = locomotion_cast<JumpjetLocomotionClass*>(pPayload->Locomotor))
+		{
+			// A jumpjet flies itself down.
+			if (pPayloadType->BalloonHover)
+			{
+				pPayloadLoco->State = JumpjetLocomotionClass::State::Hovering;
+				pPayloadLoco->IsMoving = true;
+				pPayloadLoco->DestinationCoords = pPayload->Location;
+			}
+			else
+			{
+				pPayloadLoco->Move_To(pPayload->Location);
+			}
+		}
+		else
+		{
+			// Everything else falls, the same way a unit does when it loses a flying locomotor.
+			pPayload->IsFallingDown = true;
+			TechnoExt::Fetch(pPayload)->OnParachuted = true;
+
+			if (pPayload->WhatAmI() == AbstractType::Infantry)
+				static_cast<InfantryClass*>(pPayload)->PlayAnim(Sequence::Paradrop, true, false);
+		}
+	}
+
+	pPayload->Mark(MarkType::Change);
+
+	const int sound = this->GetTypeExtData()->JumpjetCarryall_DropoffSound.Get(pThis->Type->LeaveTransportSound);
+
+	if (sound != -1)
+		VocClass::PlayAt(sound, coords);
+
+	return true;
+}
+
+void UnitExt::ReleaseJumpjetCarryallPayloadOnDeath()
+{
+	auto const pPayload = this->JumpjetCarryall_Payload;
+
+	if (!pPayload)
+		return;
+
+	if (this->GetTypeExtData()->JumpjetCarryall_ReleaseOnDeath && this->DropJumpjetCarryallPayload())
+		return;
+
+	// Either the carrier takes its cargo with it, or there was nowhere to set it down.
+	this->JumpjetCarryall_Payload = nullptr;
+
+	if (auto const pPayloadExt = FootExt::TryFetch(pPayload))
+		pPayloadExt->JumpjetCarryall_Carrier = nullptr;
+
+	pPayload->IsOnCarryall = false;
+
+	if (pPayload->IsAlive)
+	{
+		pPayload->RegisterDestruction(this->OwnerObject());
+		pPayload->UnInit();
+	}
+}
+
+void UnitExt::OnJumpjetCarryallDetach(FootClass* pTarget)
+{
+	if (this->JumpjetCarryall_Payload == pTarget)
+		this->JumpjetCarryall_Payload = nullptr;
+
+	if (this->JumpjetCarryall_Target == pTarget)
+	{
+		this->JumpjetCarryall_Target = nullptr;
+
+		if (this->JumpjetCarryall_State > JumpjetCarryallState::Ready)
+			this->CancelJumpjetCarryallMission(true);
+	}
+}

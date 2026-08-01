@@ -14,6 +14,29 @@ UnitExt::~UnitExt()
 {
 	if (this->UndergroundTracked)
 		ScenarioExt::Global()->UndergroundTracker.Remove(this->OwnerObject());
+
+	// A carrier removed without dying would otherwise strand its cargo in limbo forever.
+	if (auto const pPayload = this->JumpjetCarryall_Payload)
+	{
+		this->JumpjetCarryall_Payload = nullptr;
+
+		if (auto const pPayloadExt = FootExt::TryFetch(pPayload))
+			pPayloadExt->JumpjetCarryall_Carrier = nullptr;
+
+		if (pPayload->IsAlive)
+		{
+			pPayload->IsOnCarryall = false;
+			pPayload->UnInit();
+		}
+	}
+
+	if (auto const pTarget = this->JumpjetCarryall_Target)
+	{
+		auto const pTargetExt = FootExt::TryFetch(pTarget);
+
+		if (pTargetExt && pTargetExt->JumpjetCarryall_TargetedBy == this->OwnerObject())
+			pTargetExt->JumpjetCarryall_TargetedBy = nullptr;
+	}
 }
 
 // =============================
@@ -33,7 +56,10 @@ void UnitExt::Serialize(T& Stm)
 		.Process(this->UndergroundTracked)
 		.Process(this->ExtraTurretRecoil)
 		.Process(this->ExtraBarrelRecoil)
-		.Process(this->JumpjetCarryall_Cargo)
+		.Process(this->JumpjetCarryall_Payload)
+		.Process(this->JumpjetCarryall_Target)
+		.Process(this->JumpjetCarryall_TargetCell)
+		.Process(this->JumpjetCarryall_State)
 		;
 }
 

@@ -2,6 +2,7 @@
 
 #include <Ext/Foot/Body.h>
 #include <Ext/Scenario/Body.h>
+#include <Ext/Unit/Body.h>
 #include <Utilities/AresHelper.h>
 #include <Utilities/AresFunctions.h>
 
@@ -125,6 +126,9 @@ DEFINE_HOOK(0x4DE722, FootClass_LeaveTransport, 0x6)
 DEFINE_HOOK(0x737F80, UnitClass_ReceiveDamage_Cargo_SyncOwner, 0x6)
 {
 	GET(UnitClass*, pThis, ESI);
+
+	// A destroyed jumpjet carryall sets its cargo down (or takes it along).
+	UnitExt::Fetch(pThis)->ReleaseJumpjetCarryallPayloadOnDeath();
 
 	if (auto pPassenger = pThis->Passengers.GetFirstPassenger())
 	{
