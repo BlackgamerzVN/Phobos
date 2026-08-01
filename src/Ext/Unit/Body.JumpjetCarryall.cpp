@@ -350,24 +350,18 @@ void UnitExt::UpdateJumpjetCarryall()
 			break;
 		}
 
-		// Chase the target if it walks off to another cell.
-		if (pCell->MapCoords != this->JumpjetCarryall_TargetCell)
+		// Keep the carrier aimed at the target's cell: chase the target when it walks off,
+		// and re-issue an order the engine dropped or relocated, which it readily does for
+		// a cell it considers unreachable - and an occupied cell normally is one. This is
+		// not a way for the player to call the pickup off; that is handled explicitly by
+		// the click and stop hooks, so re-issuing cannot make a carrier unstoppable. A
+		// carrier that genuinely cannot get there is caught by the watchdog above.
+		if (pCell->MapCoords != this->JumpjetCarryall_TargetCell || pThis->Destination != pCell)
 		{
 			this->JumpjetCarryall_TargetCell = pCell->MapCoords;
 			pThis->SetDestination(pCell, true);
 			pThis->QueueMission(Mission::Move, true);
-			break;
 		}
-
-		// Stop flying the pickup the moment the carrier is no longer flying it: the player
-		// redirected it, or the engine gave up on the destination. Holding on would keep
-		// the target off limits to every other carryall.
-		const bool stillOnTask = pThis->Destination
-			? pThis->Destination == pCell
-			: pThis->CurrentMission == Mission::Move;
-
-		if (!stillOnTask)
-			this->CancelJumpjetCarryallMission(true);
 
 		break;
 	}
@@ -388,15 +382,6 @@ void UnitExt::UpdateJumpjetCarryall()
 			pJJLoco->CurrentHeight = GetCruiseHeight(pThis);
 			pJJLoco->Climb = static_cast<float>(pThis->Type->JumpjetClimb);
 			this->JumpjetCarryall_State = JumpjetCarryallState::Approach;
-			break;
-		}
-
-		// Something else sent the carrier somewhere - the player took over. A null
-		// destination is not a takeover here: arriving over the target clears it.
-		if (pThis->Destination
-			&& CellClass::Coord2Cell(pThis->Destination->GetCoords()) != this->JumpjetCarryall_TargetCell)
-		{
-			this->CancelJumpjetCarryallMission(true);
 			break;
 		}
 

@@ -3495,7 +3495,21 @@ DEFINE_HOOK(0x73F0A7, UnitClass_IsCellOccupied_Start, 0x9)
 {
 	enum { MoveOK = 0x73F23F };
 	GET(UnitClass*, pThis, ECX);
-	return pThis->Type->BalloonHover && pThis->IsInAir() ? MoveOK : 0;
+
+	if (pThis->Type->BalloonHover && pThis->IsInAir())
+		return MoveOK;
+
+	// A jumpjet carryall has to reach the very cell its pickup target is standing in, and
+	// that cell is occupied by the target. Hovering carriers already fly over everything
+	// by the check above; this gives a non-hovering one the same freedom, but only for as
+	// long as a pickup is actually running, and that is bounded by the pickup watchdog.
+	if (auto const pExt = UnitExt::TryFetch(pThis))
+	{
+		if (pExt->JumpjetCarryall_State >= JumpjetCarryallState::Approach)
+			return MoveOK;
+	}
+
+	return 0;
 }
 
 DEFINE_HOOK(0x4D62C0, FootClass_ApproachTarget_CheckArcCell, 0x6)
