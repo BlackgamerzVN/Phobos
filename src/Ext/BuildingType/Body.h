@@ -2,6 +2,7 @@
 #include <Ext/TechnoType/Body.h>
 #include <Utilities/Container.h>
 #include <Utilities/TemplateDef.h>
+#include <BuildingTypeClass.h>
 
 class BuildingTypeExt final : public TechnoTypeExt
 {
@@ -63,11 +64,12 @@ public:
 	Valueable<bool> ZShapePointMove_OnBuildup;
 	Valueable<int> SellBuildupLength;
 	Valueable<bool> IsDestroyableObstacle;
-	Valueable<bool> Explodes_DuringBuildup;
+	Nullable<bool> Explodes_DuringBuildup;
 
 	Valueable<bool> IsAnimDelayedBurst;
 
 	std::vector<std::optional<DirType>> AircraftDockingDirs;
+		Nullable<bool> AircraftDockingDir_DefaultToPoseDir;
 
 	ValueableVector<TechnoTypeClass*> FactoryPlant_AllowTypes;
 	ValueableVector<TechnoTypeClass*> FactoryPlant_DisallowTypes;
@@ -119,6 +121,12 @@ public:
 
 	Nullable<int> StartFacing;
 	Nullable<bool> StartFacing_Random;
+
+	Valueable<int> SetTabBySelecting;
+
+	Nullable<int> RevealToAll_Radius;
+
+	Nullable<int> DeployFireDelay;
 
 	// Ares 0.2
 	Valueable<bool> CloningFacility;
@@ -176,7 +184,7 @@ public:
 		, FactoryPlant_MaxCount { -1 }
 		, IsAnimDelayedBurst { true }
 		, IsDestroyableObstacle { false }
-		, Explodes_DuringBuildup { true }
+		, Explodes_DuringBuildup {}
 		, Units_RepairRate {}
 		, Units_RepairStep {}
 		, Units_RepairPercent {}
@@ -211,6 +219,9 @@ public:
 		, TurretAnim_FiringRate { 1 }
 		, StartFacing{}
 		, StartFacing_Random{}
+		, SetTabBySelecting { -1 }
+		, RevealToAll_Radius {}
+		, DeployFireDelay {}
 
 		// Ares 0.2
 		, CloningFacility { false }

@@ -1,5 +1,3 @@
-#include "Body.h"
-
 #include <JumpjetLocomotionClass.h>
 
 #include <Ext/AircraftType/Body.h>
@@ -65,7 +63,7 @@ int TechnoTypeExt::SelectForceWeapon(TechnoClass* pThis, AbstractClass* pTarget)
 	}
 
 	if (forceWeaponIndex == -1
-		&& (pTargetTechno || !this->ForceWeapon_InRange_TechnoOnly)
+		&& (pTargetTechno || !this->ForceWeapon_InRange_TechnoOnly.Get(RulesExt::Global()->ForceWeapon_InRange_TechnoOnly))
 		&& (!this->ForceWeapon_InRange.empty() || !this->ForceAAWeapon_InRange.empty()))
 	{
 		TechnoTypeExt::SelectWeaponMutex = true;
@@ -778,9 +776,11 @@ void TechnoTypeExt::LoadFromINIFile(CCINIClass* const pINI)
 	this->ShieldType.Read<true>(exINI, pSection, "ShieldType");
 
 	this->AutoDeath_Behavior.Read(exINI, pSection, "AutoDeath.Behavior");
+	this->AutoDeath_AllowLimboed.Read(exINI, pSection, "AutoDeath.AllowLimboed");
 	this->AutoDeath_VanishAnimation.Read(exINI, pSection, "AutoDeath.VanishAnimation");
 	this->AutoDeath_OnAmmoDepletion.Read(exINI, pSection, "AutoDeath.OnAmmoDepletion");
 	this->AutoDeath_OnOwnerChange.Read(exINI, pSection, "AutoDeath.OnOwnerChange");
+	this->AutoDeath_OnOwnerChange_IgnoreRevertOnExit.Read(exINI, pSection, "AutoDeath.OnOwnerChange.IgnoreRevertOnExit");
 	this->AutoDeath_OnOwnerChange_HumanToComputer.Read(exINI, pSection, "AutoDeath.OnOwnerChange.HumanToComputer");
 	this->AutoDeath_OnOwnerChange_ComputerToHuman.Read(exINI, pSection, "AutoDeath.OnOwnerChange.ComputerToHuman");
 	this->AutoDeath_AfterDelay.Read(exINI, pSection, "AutoDeath.AfterDelay");
@@ -1015,6 +1015,8 @@ void TechnoTypeExt::LoadFromINIFile(CCINIClass* const pINI)
 	this->Wake_Sinking.Read(exINI, pSection, "Wake.Sinking");
 	this->MakesWake.Read(exINI, pSection, "MakesWake");
 
+	this->CrashSpin_Multiplier.Read(exINI, pSection, "CrashSpin.Multiplier");
+
 	this->AINormalTargetingDelay.Read(exINI, pSection, "AINormalTargetingDelay");
 	this->PlayerNormalTargetingDelay.Read(exINI, pSection, "PlayerNormalTargetingDelay");
 	this->AIGuardAreaTargetingDelay.Read(exINI, pSection, "AIGuardAreaTargetingDelay");
@@ -1029,6 +1031,20 @@ void TechnoTypeExt::LoadFromINIFile(CCINIClass* const pINI)
 
 	this->AttackMove_Aggressive.Read(exINI, pSection, "AttackMove.Aggressive");
 	this->AttackMove_UpdateTarget.Read(exINI, pSection, "AttackMove.UpdateTarget");
+
+	if (exINI.ReadString(pSection, "AttackMove.StopWhenTargetAcquired") > 0)
+	{
+		Debug::Log("[Developer warning][%s] AttackMove.StopWhenTargetAcquired is deprecated and has been replaced by ApproachTarget.StopWhenInRange! If both are set, the latter will be used.\n", pSection);
+	}
+	this->ApproachTarget_StopWhenInRange.Read(exINI, pSection, "AttackMove.StopWhenTargetAcquired");
+	this->ApproachTarget_StopWhenInRange.Read(exINI, pSection, "ApproachTarget.StopWhenInRange");
+
+	if (exINI.ReadString(pSection, "AttackMove.PursuitTarget") > 0)
+	{
+		Debug::Log("[Developer warning][%s] AttackMove.PursuitTarget is deprecated and has been replaced by ApproachTarget.PursuitTarget! If both are set, the latter will be used.\n", pSection);
+	}
+	this->ApproachTarget_PursuitTarget.Read(exINI, pSection, "AttackMove.PursuitTarget");
+	this->ApproachTarget_PursuitTarget.Read(exINI, pSection, "ApproachTarget.PursuitTarget");
 
 	this->KeepTargetOnMove.Read(exINI, pSection, "KeepTargetOnMove");
 	this->KeepTargetOnMove_Weapon.Read(exINI, pSection, "KeepTargetOnMove.Weapon");
@@ -1079,8 +1095,6 @@ void TechnoTypeExt::LoadFromINIFile(CCINIClass* const pINI)
 	this->AttackMove_Follow.Read(exINI, pSection, "AttackMove.Follow");
 	this->AttackMove_Follow_IncludeAir.Read(exINI, pSection, "AttackMove.Follow.IncludeAir");
 	this->AttackMove_Follow_IfMindControlIsFull.Read(exINI, pSection, "AttackMove.Follow.IfMindControlIsFull");
-	this->AttackMove_StopWhenTargetAcquired.Read(exINI, pSection, "AttackMove.StopWhenTargetAcquired");
-	this->AttackMove_PursuitTarget.Read(exINI, pSection, "AttackMove.PursuitTarget");
 
 	this->Ammo_AutoConvertMinimumAmount.Read(exINI, pSection, "Ammo.AutoConvertMinimumAmount");
 	this->Ammo_AutoConvertMaximumAmount.Read(exINI, pSection, "Ammo.AutoConvertMaximumAmount");
@@ -1121,6 +1135,13 @@ void TechnoTypeExt::LoadFromINIFile(CCINIClass* const pINI)
 		|| ExtraThreatCoefficient_InRangeDistance.Get(RulesExt::Global()->ExtraThreatCoefficient_InRangeDistance) != 0.0
 		|| ExtraThreatCoefficient_Facing.Get(RulesExt::Global()->ExtraThreatCoefficient_Facing) != 0.0
 		|| ExtraThreatCoefficient_DistanceToLastTarget.Get(RulesExt::Global()->ExtraThreatCoefficient_DistanceToLastTarget) != 0.0;
+
+	this->Convert_Health_AbovePercent.Read(exINI, pSection, "Convert.Health.AbovePercent");
+	this->Convert_Health_BelowPercent.Read(exINI, pSection, "Convert.Health.BelowPercent");
+	this->Convert_Health.Read(exINI, pSection, "Convert.Health");
+
+	if (this->Convert_Health_AbovePercent > this->Convert_Health_BelowPercent)
+		Debug::Log("[Developer warning][%s] Convert.Health.AbovePercent is greater than Convert.Health.BelowPercent, resulting in no conversion.\n", pSection);
 
 	// Ares 0.2
 	this->RadarJamRadius.Read(exINI, pSection, "RadarJamRadius");
@@ -1360,6 +1381,8 @@ void TechnoTypeExt::LoadFromINIFile(CCINIClass* const pINI)
 	if (GeneralUtils::IsValidString(pThis->PaletteFile) && !pThis->Palette)
 		Debug::Log("[Developer warning] [%s] has Palette=%s set but no palette file was loaded (missing file or wrong filename). Missing palettes cause issues with lighting recalculations.\n", pArtSection, pThis->PaletteFile);
 
+	DropCrate.Read(exINI, pSection, "DropCrate");
+
 	// VoiceIFVRepair from Ares 0.2
 	this->VoiceIFVRepair.Read(exINI, pSection, "VoiceIFVRepair");
 	this->ParseVoiceWeaponAttacks(exINI, pSection, this->VoiceWeaponAttacks, this->VoiceEliteWeaponAttacks);
@@ -1422,9 +1445,11 @@ void TechnoTypeExt::Serialize(T& Stm)
 		.Process(this->PassengerDeletionType)
 
 		.Process(this->AutoDeath_Behavior)
+		.Process(this->AutoDeath_AllowLimboed)
 		.Process(this->AutoDeath_VanishAnimation)
 		.Process(this->AutoDeath_OnAmmoDepletion)
 		.Process(this->AutoDeath_OnOwnerChange)
+		.Process(this->AutoDeath_OnOwnerChange_IgnoreRevertOnExit)
 		.Process(this->AutoDeath_OnOwnerChange_HumanToComputer)
 		.Process(this->AutoDeath_OnOwnerChange_ComputerToHuman)
 		.Process(this->AutoDeath_AfterDelay)
@@ -1630,6 +1655,8 @@ void TechnoTypeExt::Serialize(T& Stm)
 		.Process(this->Wake_Sinking)
 		.Process(this->MakesWake)
 
+		.Process(this->CrashSpin_Multiplier)
+
 		.Process(this->AINormalTargetingDelay)
 		.Process(this->PlayerNormalTargetingDelay)
 		.Process(this->AIGuardAreaTargetingDelay)
@@ -1642,6 +1669,9 @@ void TechnoTypeExt::Serialize(T& Stm)
 
 		.Process(this->AttackMove_Aggressive)
 		.Process(this->AttackMove_UpdateTarget)
+
+		.Process(this->ApproachTarget_StopWhenInRange)
+		.Process(this->ApproachTarget_PursuitTarget)
 
 		.Process(this->BunkerableAnyway)
 		.Process(this->KeepTargetOnMove)
@@ -1690,6 +1720,8 @@ void TechnoTypeExt::Serialize(T& Stm)
 
 		//.Process(this->SecondaryFire)
 
+		.Process(this->DropCrate)
+
 		.Process(this->DebrisTypes_Limit)
 		.Process(this->DebrisMinimums)
 
@@ -1698,8 +1730,6 @@ void TechnoTypeExt::Serialize(T& Stm)
 		.Process(this->AttackMove_Follow)
 		.Process(this->AttackMove_Follow_IncludeAir)
 		.Process(this->AttackMove_Follow_IfMindControlIsFull)
-		.Process(this->AttackMove_StopWhenTargetAcquired)
-		.Process(this->AttackMove_PursuitTarget)
 
 		.Process(this->MultiWeapon)
 		.Process(this->MultiWeapon_IsSecondary)
@@ -1744,6 +1774,10 @@ void TechnoTypeExt::Serialize(T& Stm)
 		.Process(this->ExtraThreatCoefficient_InRangeDistance)
 		.Process(this->ExtraThreatCoefficient_Facing)
 		.Process(this->ExtraThreatCoefficient_DistanceToLastTarget)
+
+		.Process(this->Convert_Health_AbovePercent)
+		.Process(this->Convert_Health_BelowPercent)
+		.Process(this->Convert_Health)
 		;
 }
 void TechnoTypeExt::LoadFromStream(PhobosStreamReader& Stm)

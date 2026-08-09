@@ -264,6 +264,10 @@ void BuildingTypeExt::LoadFromINIFile(CCINIClass* const pINI)
 			this->PowersUp_Buildings.emplace_back(pPowerUpType);
 	}
 
+	this->SetTabBySelecting.Read(exINI, pSection, "SetTabBySelecting");
+
+	this->RevealToAll_Radius.Read(exINI, pSection, "RevealToAll.Radius");
+
 	if (pThis->NumberOfDocks > 0)
 	{
 		std::optional<DirType> empty;
@@ -285,8 +289,11 @@ void BuildingTypeExt::LoadFromINIFile(CCINIClass* const pINI)
 				this->AircraftDockingDirs[i] = nLandingDir.Get();
 		}
 	}
+	this->AircraftDockingDir_DefaultToPoseDir.Read(exArtINI, pArtSection, "AircraftDockingDir.DefaultToPoseDir");
 
 	this->Refinery_UseNormalActiveAnim.Read(exArtINI, pArtSection, "Refinery.UseNormalActiveAnim");
+
+	this->DeployFireDelay.Read(exINI, pSection, "DeployFireDelay");
 
 	// Ares tag
 	this->SpyEffect_Custom.Read(exINI, pSection, "SpyEffect.Custom");
@@ -391,6 +398,7 @@ void BuildingTypeExt::Serialize(T& Stm)
 		.Process(this->ZShapePointMove_OnBuildup)
 		.Process(this->SellBuildupLength)
 		.Process(this->AircraftDockingDirs)
+		.Process(this->AircraftDockingDir_DefaultToPoseDir)
 		.Process(this->FactoryPlant_AllowTypes)
 		.Process(this->FactoryPlant_DisallowTypes)
 		.Process(this->FactoryPlant_MaxCount)
@@ -431,6 +439,9 @@ void BuildingTypeExt::Serialize(T& Stm)
 		.Process(this->TurretAnim_FiringFrames)
 		.Process(this->StartFacing)
 		.Process(this->StartFacing_Random)
+		.Process(this->SetTabBySelecting)
+		.Process(this->RevealToAll_Radius)
+		.Process(this->DeployFireDelay)
 
 		// Ares 0.2
 		.Process(this->CloningFacility)

@@ -1,5 +1,3 @@
-#include "Body.h"
-
 #include <Ext/Anim/Body.h>
 #include <Ext/Building/Body.h>
 #include <Ext/Bullet/Body.h>
@@ -449,9 +447,7 @@ DEFINE_HOOK(0x6FC5C7, TechnoClass_CanFire_OpenTopped, 0x6)
 	if (auto const pTransportFoot = abstract_cast<FootClass*>(pTransport))
 	{
 		if (pTransportFoot->IsAttackedByLocomotor && !pTypeExt->OpenTopped_AllowFiringIfAttackedByLocomotor.Get(RulesExt::Global()->OpenTopped_AllowFiringIfAttackedByLocomotor))
-		{
 			return Illegal;
-		}
 
 		if (!pTypeExt->OpenTopped_FireWhileMoving.Get(RulesExt::Global()->OpenTopped_FireWhileMoving)
 			|| !TechnoExt::Fetch(pThis)->TypeExtData->OpenTransport_FireWhileMoving.Get(RulesExt::Global()->OpenTransport_FireWhileMoving)
@@ -559,6 +555,18 @@ DEFINE_HOOK(0x6FC7EB, TechnoClass_CanFire_InterceptBullet, 0x7)
 
 	R->AL(pTarget->IsInAir());
 	return ContinueCheck;
+}
+
+DEFINE_HOOK(0x447FED, BuildingClass_CanFire_OmniFire, 0x7)
+{
+	enum { SkipGameCode = 0x448052 };
+
+	GET(BuildingClass* const, pThis, ESI);
+	GET_STACK(const int, weaponIndex, STACK_OFFSET(0xC, 0x8));
+
+	auto const pWeapon = pThis->GetWeapon(weaponIndex)->WeaponType;
+
+	return pWeapon->OmniFire ? SkipGameCode : 0;
 }
 
 #pragma endregion
@@ -861,7 +869,7 @@ DEFINE_HOOK(0x6FF660, TechnoClass_FireAt_LateLogic, 0x6)
 			pBulletExt->InterceptorTechnoType = pTypeExt;
 			pBulletExt->InterceptedStatus |= InterceptedStatus::Targeted;
 
-			if (!pInterceptorType->ApplyFirepowerMult)
+			if (!pInterceptorType->ApplyFirepowerMult.Get(RulesExt::Global()->Interceptor_ApplyFirepowerMult))
 				pBullet->Health = pWeapon->Damage;
 		}
 	}
@@ -981,7 +989,7 @@ CoordStruct* GetFLHTemp::UnitClassFake::_GetFLH(CoordStruct* outBuffer, int weap
 	{
 		const auto pTransporter = pThis->Transporter;
 
-		if (pThis->InOpenToppedTransport && pTransporter && TechnoExt::Fetch(pTransporter)->TypeExtData->AlternateFLH_ApplyVehicle)
+		if (pThis->InOpenToppedTransport && pTransporter && TechnoExt::Fetch(pTransporter)->TypeExtData->AlternateFLH_ApplyVehicle.Get(RulesExt::Global()->AlternateFLH_ApplyVehicle))
 		{
 			if (const int idx = pTransporter->Passengers.IndexOf(pThis))
 			{
@@ -1038,7 +1046,7 @@ DEFINE_HOOK(0x6F3AEB, TechnoClass_GetFLH, 0x6)
 		if (index < static_cast<int>(pTypeExt->AlternateFLHs.size()))
 			flh = pTypeExt->AlternateFLHs[index];
 
-		if (!pTypeExt->AlternateFLH_OnTurret)
+		if (!pTypeExt->AlternateFLH_OnTurret.Get(RulesExt::Global()->AlternateFLH_OnTurret))
 			allowOnTurret = false;
 	}
 
@@ -1240,3 +1248,46 @@ DEFINE_HOOK(0x737086, UnitClass_FiringAI_Gattling, 0x9)
 }
 
 #pragma endregion
+
+DEFINE_HOOK(0x4D5A34, FootClass_ApproachTarget_StopWhenInRange, 0x6)
+{
+	GET_STACK(const bool, closeEnough, STACK_OFFSET(0x158, -0x146));
+
+	if (closeEnough)
+	{
+		GET(FootClass*, pThis, EBX);
+		const auto pTypeExt = TechnoExt::Fetch(pThis)->TypeExtData;
+
+		// Per-type setting takes priority, falls back to the global one.
+		if (pTypeExt->ApproachTarget_StopWhenInRange.Get(RulesExt::Global()->ApproachTarget_StopWhenInRange))
+		{
+			pThis->StopMoving();
+			pThis->AbortMotion();
+		}
+	}
+
+	return 0;
+}
+
+DEFINE_HOOK(0x4D57EA, FootClass_ApproachTarget_PursuitTarget, 0x9)
+{
+	enum { Return = 0x4D5A34 };
+
+	GET(FootClass*, pThis, EBX);
+	GET_STACK(const bool, closeEnough, STACK_OFFSET(0x158, -0x146));
+
+	const auto pTypeExt = TechnoExt::Fetch(pThis)->TypeExtData;
+
+	if (closeEnough && pTypeExt->ApproachTarget_StopWhenInRange.Get(RulesExt::Global()->ApproachTarget_StopWhenInRange))
+		return 0;
+
+	if (pTypeExt->ApproachTarget_PursuitTarget)
+	{
+		pThis->SetDestination(pThis->Target, true);
+		R->EDI(0);
+		R->Stack(STACK_OFFSET(0x158, -0x130), 0);
+		return Return;
+	}
+
+	return 0;
+}

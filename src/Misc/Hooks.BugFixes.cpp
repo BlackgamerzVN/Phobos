@@ -1,5 +1,6 @@
 #include <AircraftTrackerClass.h>
 #include <EventClass.h>
+#include <HoverLocomotionClass.h>
 #include <JumpjetLocomotionClass.h>
 #include <TunnelLocomotionClass.h>
 #include <FileFormats/HVA.h>
@@ -461,7 +462,7 @@ DEFINE_HOOK(0x73B2A2, UnitClass_DrawObject_DrawerBlitterFix, 0x6)
 }
 
 // Set all bullet params (Bright) from weapon for nuke carrier weapon.
-DEFINE_HOOK(0x44CABA, BuildingClass_Mission_Missile_BulletParams, 0x7)
+DEFINE_HOOK(0x44CABA, BuildingClass_Mission_Missile_BulletParams, 0x0)
 {
 	enum { SkipGameCode = 0x44CAF2 };
 
@@ -1245,7 +1246,7 @@ DEFINE_HOOK(0x4C75DA, EventClass_RespondToEvent_Stop, 0x6)
 
 	// Check aircraft
 	const auto pAircraft = abstract_cast<AircraftClass*>(pTechno);
-	const bool commonAircraft = pAircraft && !pAircraft->Airstrike && !pAircraft->Spawned;
+	const bool commonAircraft = pAircraft && !pAircraft->Airstrike && !pAircraft->IsALoaner;
 	const auto mission = pTechno->CurrentMission;
 
 	// To avoid aircraft overlap by keep link if is returning or is in airport now.
@@ -2212,7 +2213,7 @@ DEFINE_HOOK(0x489416, MapClass_DamageArea_AirDamageSelfFix, 0x6)
 
 	GET_BASE(WarheadTypeClass*, pWarhead, 0xC);
 
-	if (WarheadTypeExt::Fetch(pWarhead)->AllowDamageOnSelf)
+	if (WarheadTypeExt::Fetch(pWarhead)->AllowDamageOnSelf.Get(RulesExt::Global()->AllowDamageOnSelf))
 		return 0;
 
 	return NextTechno;
@@ -2411,7 +2412,7 @@ DEFINE_HOOK(0x415F25, AircraftClass_FireAt_Vertical, 0x6)
 
 	GET(BulletClass*, pBullet, ESI);
 
-	if (pBullet->HasParachute || (pBullet->Type->Vertical && BulletTypeExt::Fetch(pBullet->Type)->Vertical_AircraftFix))
+	if (pBullet->HasParachute || (pBullet->Type->Vertical && BulletTypeExt::Fetch(pBullet->Type)->Vertical_AircraftFix.Get(RulesExt::Global()->Vertical_AircraftFix)))
 		return SkipGameCode;
 
 	return 0;
@@ -2744,6 +2745,27 @@ DEFINE_HOOK(0x5194EF, InfantryClass_DrawIt_DrawShadow, 0x5)
 	return pThis->CloakState != CloakState::Uncloaked ? SkipDraw : 0;
 }
 
+#pragma region Locomotor=Fly shadow fix
+
+DEFINE_HOOK(0x4146EA, AircraftClass_DrawIt_SkipShadowPoint, 0x7)
+{
+	enum { SkipGameCode = 0x4146F1 };
+
+	GET(Point2D*, pBuffer, ECX);
+
+	*pBuffer = Point2D::Empty;
+	R->EAX(pBuffer);
+	return SkipGameCode;
+}
+
+DEFINE_JUMP(LJMP, 0x41476F, 0x4147F9)
+DEFINE_JUMP(LJMP, 0x4148A5, 0x4148B1)
+
+// Redirect FlyLocomotionClass::Shadow_Point to LocomotionClass::Shadow_Point
+DEFINE_JUMP(VTABLE, 0x7E8A24, 0x55A8C0)
+
+#pragma endregion
+
 // Fix the issue that the jumpjet vehicles cannot stop correctly after going berserk
 DEFINE_HOOK(0x74431F, UnitClass_ReadyToNextMission_HuntCheck, 0x6)
 {
@@ -2961,7 +2983,8 @@ DEFINE_HOOK(0x54CC16, JumpjetLocomotionClass_CrashDescent_OffMap, 0x8)
 
 // RocketLocomotionClass::Process - health check after position update.
 // If off-map, bypass the Health > 0 skip and force detonation/cleanup.
-DEFINE_HOOK(0x662FD5, RocketLocomotionClass_Process_OffMap, 0x6)
+// Disable it since it prevents the regular OOB missile cruise.
+/*DEFINE_HOOK(0x662FD5, RocketLocomotionClass_Process_OffMap, 0x6)
 {
 	enum { ForceCleanup = 0x662FDF };
 
@@ -2971,7 +2994,7 @@ DEFINE_HOOK(0x662FD5, RocketLocomotionClass_Process_OffMap, 0x6)
 		return ForceCleanup;
 
 	return 0;
-}
+}*/
 
 DEFINE_HOOK(0x4DEC7F, FootClass_Crash_FallingDownFix, 0x7)
 {
@@ -3298,7 +3321,7 @@ DEFINE_HOOK(0x7442D6, FootClass_ReadyToNextMission_MovingCheck, 0x6) // Unit
 {
 	GET(FootClass*, pThis, ESI);
 	const auto pLoco = pThis->Locomotor.GetInterfacePtr();
-	R->AL(!locomotion_cast<JumpjetLocomotionClass*>(pLoco) && pLoco->Is_Moving_Now());
+	R->AL(!locomotion_cast<JumpjetLocomotionClass*>(pLoco) && !locomotion_cast<HoverLocomotionClass*>(pLoco) && pLoco->Is_Moving_Now());
 	return R->Origin() + 0xF;
 }
 

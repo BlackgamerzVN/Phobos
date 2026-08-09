@@ -26,6 +26,7 @@ public:
 	int AttackMoveFollowerTempCount;
 	UnitClass* JumpjetCarryall_Carrier; // Carrier slinging this unit, if any.
 	UnitClass* JumpjetCarryall_TargetedBy; // Carrier currently flying over to pick this unit up, if any.
+	bool IsOwnerChangeFromRevertOnExit;
 
 	explicit FootExt(FootClass* const OwnerObject) : TechnoExt(OwnerObject)
 		, LastKillWasTeamTarget { false }
@@ -43,8 +44,9 @@ public:
 		, AttackMoveFollowerTempCount { 0 }
 		, JumpjetCarryall_Carrier { nullptr }
 		, JumpjetCarryall_TargetedBy { nullptr }
+		, IsOwnerChangeFromRevertOnExit { false }
 	{ }
-
+  
 	FootClass* OwnerObject() const
 	{
 		return static_cast<FootClass*>(this->GetAttachedObject());
@@ -67,6 +69,8 @@ public:
 	void UpdateOnTunnelEnter();
 	void UpdateOnTunnelExit();
 	void UpdateTypeData(TechnoTypeClass* pCurrentType);
+	void HealthAutoConvertActions();
+	void AmmoAutoConvertActions();
 
 	virtual void LoadFromStream(PhobosStreamReader& Stm) override;
 	virtual void SaveToStream(PhobosStreamWriter& Stm) override;
