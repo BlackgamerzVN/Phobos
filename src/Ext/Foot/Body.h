@@ -3,6 +3,8 @@
 #include <Ext/Techno/Body.h>
 #include <FootClass.h>
 
+class UnitClass;
+
 // Intermediate base mirroring FootClass in the extension hierarchy; holds the
 // data shared by units, infantry and aircraft (but not buildings).
 // UnitExt / InfantryExt / AircraftExt derive from this.
@@ -22,6 +24,8 @@ public:
 	bool ResetLocomotor;
 	bool JumpjetStraightAscend; // Is set to true jumpjet units will ascend straight and do not adjust rotation or position during it.
 	int AttackMoveFollowerTempCount;
+	UnitClass* JumpjetCarryall_Carrier; // Carrier slinging this unit, if any.
+	UnitClass* JumpjetCarryall_TargetedBy; // Carrier currently flying over to pick this unit up, if any.
 	bool IsOwnerChangeFromRevertOnExit;
 
 	explicit FootExt(FootClass* const OwnerObject) : TechnoExt(OwnerObject)
@@ -38,9 +42,11 @@ public:
 		, ResetLocomotor { false }
 		, JumpjetStraightAscend { false }
 		, AttackMoveFollowerTempCount { 0 }
+		, JumpjetCarryall_Carrier { nullptr }
+		, JumpjetCarryall_TargetedBy { nullptr }
 		, IsOwnerChangeFromRevertOnExit { false }
 	{ }
-
+  
 	FootClass* OwnerObject() const
 	{
 		return static_cast<FootClass*>(this->GetAttachedObject());

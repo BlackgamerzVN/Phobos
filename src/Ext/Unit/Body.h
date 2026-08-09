@@ -4,6 +4,16 @@
 #include <Ext/UnitType/Body.h>
 #include <UnitClass.h>
 
+// Phase of a jumpjet carryall pickup mission.
+enum class JumpjetCarryallState : int
+{
+	Inactive = 0, // Idle on the ground, or carrying cargo with no mission running.
+	Ready = 1,    // Idle in the air with a free sling.
+	Approach = 2, // Flying towards the target's cell.
+	Descend = 3,  // Over the target, lowering onto it.
+	Ascend = 4,   // Cargo secured, climbing back to cruise height.
+};
+
 // Concrete leaf extension for UnitClass. Empty for now: all techno-level data lives
 // in TechnoExt; this leaf only exists so a unit's extension has its own
 // concrete type (TechnoExt itself is never instantiated).
@@ -26,6 +36,13 @@ public:
 	std::vector<RecoilData> ExtraTurretRecoil;
 	std::vector<RecoilData> ExtraBarrelRecoil;
 
+	FootClass* JumpjetCarryall_Payload; // Cargo currently slung under this carrier.
+	FootClass* JumpjetCarryall_Target; // Pickup target of the running carryall mission.
+	CellStruct JumpjetCarryall_TargetCell; // Last known cell of the pickup target.
+	JumpjetCarryallState JumpjetCarryall_State;
+	int JumpjetCarryall_Timer; // Frames the running pickup, or the climb after one, has spent without progress.
+	int JumpjetCarryall_BestDistance; // Closest the carrier has ever been to the pickup target, in cells.
+
 	explicit UnitExt(UnitClass* const OwnerObject) : FootExt(OwnerObject)
 		, SubterraneanHarvStatus { 0 }
 		, SubterraneanHarvRallyPoint { nullptr }
@@ -37,6 +54,12 @@ public:
 		, UndergroundTracked { false }
 		, ExtraTurretRecoil {}
 		, ExtraBarrelRecoil {}
+		, JumpjetCarryall_Payload { nullptr }
+		, JumpjetCarryall_Target { nullptr }
+		, JumpjetCarryall_TargetCell {}
+		, JumpjetCarryall_State { JumpjetCarryallState::Inactive }
+		, JumpjetCarryall_Timer { 0 }
+		, JumpjetCarryall_BestDistance { INT_MAX }
 	{ }
 
 	virtual ~UnitExt() override;
@@ -49,6 +72,29 @@ public:
 	void InitializeRecoilData();
 	void UpdateRecoilData();
 	void RecordRecoilData();
+
+	// Jumpjet carryall
+	bool IsJumpjetCarryall() const;
+
+	// True only while the carrier is over its pickup target and lowering onto it. The
+	// target's cell is occupied by definition, so the locomotor's landing pathfinding
+	// checks have to be waived for the carrier to reach it.
+	bool IsJumpjetCarryallLandingOnTarget() const;
+
+	double GetJumpjetCarryallSpeedMultiplier() const;
+	bool CanLiftJumpjetCargo(TechnoClass* pTarget) const;
+
+	// Advances the pickup's watchdog. Returns false when the mission has to be given up,
+	// either because the player called the carrier off or because it has spent too long
+	// getting no closer to the target.
+	bool TickJumpjetCarryallPickup();
+
+	void StartJumpjetCarryallMission(FootClass* pTarget);
+	void CancelJumpjetCarryallMission(bool keepReady = false);
+	void UpdateJumpjetCarryall();
+	bool DropJumpjetCarryallPayload();
+	void ReleaseJumpjetCarryallPayloadOnDeath();
+	void OnJumpjetCarryallDetach(FootClass* pTarget);
 
 	static UnitClass* Deployer;
 

@@ -2,6 +2,19 @@
 
 UnitTypeExt::ExtContainer UnitTypeExt::ExtMap;
 
+bool UnitTypeExt::IsJumpjetCarryallInUse()
+{
+	for (auto const pType : UnitTypeClass::Array)
+	{
+		auto const pExt = UnitTypeExt::TryFetch(pType);
+
+		if (pExt && pExt->JumpjetCarryall)
+			return true;
+	}
+
+	return false;
+}
+
 void UnitTypeExt::ApplyTurretOffsetUnit(Matrix3D* mtx, double factor, int turIdx)
 {
 	// Does not verify if the offset actually has all values parsed as it makes no difference, it will be 0 for the unparsed ones either way.
@@ -135,6 +148,21 @@ void UnitTypeExt::LoadFromINIFile(CCINIClass* const pINI)
 	{
 		this->ExtraTurretCount = 0;
 	}
+
+	// Jumpjet carryall, carrier side
+	this->JumpjetCarryall.Read(exINI, pSection, "JumpjetCarryall");
+	this->JumpjetCarryall_SizeLimit.Read(exINI, pSection, "Carryall.SizeLimit");
+	this->JumpjetCarryall_SizeLimit.Read(exINI, pSection, "JumpjetCarryall.SizeLimit");
+	this->JumpjetCarryall_AllowedTypes.Read(exINI, pSection, "JumpjetCarryall.AllowedTypes");
+	this->JumpjetCarryall_DisallowedTypes.Read(exINI, pSection, "JumpjetCarryall.DisallowedTypes");
+	this->JumpjetCarryall_AllowInfantry.Read(exINI, pSection, "JumpjetCarryall.AllowInfantry");
+	this->JumpjetCarryall_AllowVehicles.Read(exINI, pSection, "JumpjetCarryall.AllowVehicles");
+	this->JumpjetCarryall_AllowAllied.Read(exINI, pSection, "JumpjetCarryall.AllowAllied");
+	this->JumpjetCarryall_SpeedMultiplier.Read(exINI, pSection, "JumpjetCarryall.SpeedMultiplier");
+	this->JumpjetCarryall_DescendRate.Read(exINI, pSection, "JumpjetCarryall.DescendRate");
+	this->JumpjetCarryall_PickupSound.Read(exINI, pSection, "JumpjetCarryall.PickupSound");
+	this->JumpjetCarryall_DropoffSound.Read(exINI, pSection, "JumpjetCarryall.DropoffSound");
+	this->JumpjetCarryall_ReleaseOnDeath.Read(exINI, pSection, "JumpjetCarryall.ReleaseOnDeath");
 }
 
 template <typename T>
@@ -200,6 +228,18 @@ void UnitTypeExt::Serialize(T& Stm)
 		.Process(this->ExtraTurretCount)
 		.Process(this->ExtraTurretOffsets)
 		.Process(this->BurstPerTurret)
+		.Process(this->JumpjetCarryall)
+		.Process(this->JumpjetCarryall_SizeLimit)
+		.Process(this->JumpjetCarryall_AllowedTypes)
+		.Process(this->JumpjetCarryall_DisallowedTypes)
+		.Process(this->JumpjetCarryall_AllowInfantry)
+		.Process(this->JumpjetCarryall_AllowVehicles)
+		.Process(this->JumpjetCarryall_AllowAllied)
+		.Process(this->JumpjetCarryall_SpeedMultiplier)
+		.Process(this->JumpjetCarryall_DescendRate)
+		.Process(this->JumpjetCarryall_PickupSound)
+		.Process(this->JumpjetCarryall_DropoffSound)
+		.Process(this->JumpjetCarryall_ReleaseOnDeath)
 		;
 }
 

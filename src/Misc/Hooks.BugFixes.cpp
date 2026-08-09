@@ -1266,6 +1266,15 @@ DEFINE_HOOK(0x4C75DA, EventClass_RespondToEvent_Stop, 0x6)
 	// Stop any enter action
 	pTechno->QueueUpToEnter = nullptr;
 
+	// Stop any running jumpjet carryall pickup. Stop never reaches the click handlers, and
+	// once the carrier is over its target it looks exactly like a completed move, so this
+	// is the only place the order can be told apart from a normal arrival.
+	if (const auto pUnitExt = UnitExt::TryFetch(abstract_cast<UnitClass*>(pTechno)))
+	{
+		if (pUnitExt->JumpjetCarryall_State >= JumpjetCarryallState::Approach)
+			pUnitExt->CancelJumpjetCarryallMission(true);
+	}
+
 	if (commonAircraft)
 	{
 		pAircraft->SetArchiveTarget(nullptr);
@@ -3509,7 +3518,21 @@ DEFINE_HOOK(0x73F0A7, UnitClass_IsCellOccupied_Start, 0x9)
 {
 	enum { MoveOK = 0x73F23F };
 	GET(UnitClass*, pThis, ECX);
-	return pThis->Type->BalloonHover && pThis->IsInAir() ? MoveOK : 0;
+
+	if (pThis->Type->BalloonHover && pThis->IsInAir())
+		return MoveOK;
+
+	// A jumpjet carryall has to reach the very cell its pickup target is standing in, and
+	// that cell is occupied by the target. Hovering carriers already fly over everything
+	// by the check above; this gives a non-hovering one the same freedom, but only for as
+	// long as a pickup is actually running, and that is bounded by the pickup watchdog.
+	if (auto const pExt = UnitExt::TryFetch(pThis))
+	{
+		if (pExt->JumpjetCarryall_State >= JumpjetCarryallState::Approach)
+			return MoveOK;
+	}
+
+	return 0;
 }
 
 DEFINE_HOOK(0x4D62C0, FootClass_ApproachTarget_CheckArcCell, 0x6)

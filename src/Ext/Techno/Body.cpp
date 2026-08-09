@@ -185,7 +185,12 @@ double TechnoExt::GetCurrentSpeedMultiplier(FootClass* pThis)
 	else
 		houseMultiplier = pThis->Owner->Type->SpeedUnitsMult;
 
-	return pThis->SpeedMultiplier * houseMultiplier * TechnoExt::Fetch(pThis)->AE.SpeedMultiplier *
+	double extraMultiplier = 1.0;
+
+	if (whatAmI == AbstractType::Unit)
+		extraMultiplier = UnitExt::Fetch(static_cast<UnitClass*>(pThis))->GetJumpjetCarryallSpeedMultiplier();
+
+	return pThis->SpeedMultiplier * houseMultiplier * extraMultiplier * TechnoExt::Fetch(pThis)->AE.SpeedMultiplier *
 		(pThis->HasAbility(Ability::Faster) ? RulesClass::Instance->VeteranSpeed : 1.0);
 }
 

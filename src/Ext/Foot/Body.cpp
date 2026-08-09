@@ -883,6 +883,8 @@ void FootExt::Serialize(T& Stm)
 		.Process(this->ResetLocomotor)
 		.Process(this->JumpjetStraightAscend)
 		.Process(this->AttackMoveFollowerTempCount)
+		.Process(this->JumpjetCarryall_Carrier)
+		.Process(this->JumpjetCarryall_TargetedBy)
 		//.Process(this->IsOwnerChangeFromRevertOnExit) Temporary flag, does not need to be serialized.
 		;
 }

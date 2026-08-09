@@ -255,8 +255,27 @@ DEFINE_HOOK(0x54C58E, JumpjetLocomotionClass_Descending_PathfindingChecks, 0x7)
 
 	auto const pUnit = abstract_cast<UnitClass*, true>(pThis->LinkedTo);
 
-	if (pUnit && pUnit->CurrentMission == Mission::Unload && UnitExt::SimpleDeployerAllowedToDeploy(pUnit, false, true))
+	if (!pUnit)
+		return 0;
+
+	if (pUnit->CurrentMission == Mission::Unload && UnitExt::SimpleDeployerAllowedToDeploy(pUnit, false, true))
 		return SkipGameCode;
+
+	// A carryall lowering itself onto its pickup target is landing on an occupied cell by
+	// design, which the pathfinding checks would otherwise refuse. Water and beach stay
+	// off limits, the same way they do for the deploy case above; a pickup that cannot be
+	// reached times out on its own instead.
+	if (auto const pExt = UnitExt::TryFetch(pUnit))
+	{
+		if (pExt->IsJumpjetCarryallLandingOnTarget())
+		{
+			auto const pCell = pUnit->GetCell();
+			const auto landType = pCell ? pCell->LandType : LandType::Water;
+
+			if (landType != LandType::Water && landType != LandType::Beach)
+				return SkipGameCode;
+		}
+	}
 
 	return 0;
 }

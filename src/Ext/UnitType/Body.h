@@ -83,6 +83,20 @@ public:
 	std::vector<CoordStruct> ExtraTurretOffsets;
 	Valueable<int> BurstPerTurret;
 
+	// Jumpjet carryall, carrier side (see TechnoTypeExt for the cargo side).
+	Valueable<bool> JumpjetCarryall;
+	Valueable<int> JumpjetCarryall_SizeLimit;
+	ValueableVector<TechnoTypeClass*> JumpjetCarryall_AllowedTypes;
+	ValueableVector<TechnoTypeClass*> JumpjetCarryall_DisallowedTypes;
+	Valueable<bool> JumpjetCarryall_AllowInfantry;
+	Valueable<bool> JumpjetCarryall_AllowVehicles;
+	Valueable<bool> JumpjetCarryall_AllowAllied;
+	Valueable<double> JumpjetCarryall_SpeedMultiplier;
+	Valueable<int> JumpjetCarryall_DescendRate;
+	NullableIdx<VocClass> JumpjetCarryall_PickupSound;
+	NullableIdx<VocClass> JumpjetCarryall_DropoffSound;
+	Valueable<bool> JumpjetCarryall_ReleaseOnDeath;
+
 	explicit UnitTypeExt(UnitTypeClass* const OwnerObject) : TechnoTypeExt(OwnerObject)
 		, SinkSpeed {}
 		, Sinkable {}
@@ -143,6 +157,18 @@ public:
 		, ExtraTurretCount { 0 }
 		, ExtraTurretOffsets { }
 		, BurstPerTurret { 0 }
+		, JumpjetCarryall { false }
+		, JumpjetCarryall_SizeLimit { -1 }
+		, JumpjetCarryall_AllowedTypes {}
+		, JumpjetCarryall_DisallowedTypes {}
+		, JumpjetCarryall_AllowInfantry { true }
+		, JumpjetCarryall_AllowVehicles { true }
+		, JumpjetCarryall_AllowAllied { true }
+		, JumpjetCarryall_SpeedMultiplier { 1.0 }
+		, JumpjetCarryall_DescendRate { -1 }
+		, JumpjetCarryall_PickupSound {}
+		, JumpjetCarryall_DropoffSound {}
+		, JumpjetCarryall_ReleaseOnDeath { true }
 	{ }
 
 	UnitTypeClass* OwnerObject() const
@@ -168,6 +194,10 @@ public:
 	{
 		return AbstractExt::TryFetch<UnitTypeExt>(pThis);
 	}
+
+	// Whether any loaded UnitType is a jumpjet carryall, i.e. whether the feature's hooks
+	// have to survive the optimization pass.
+	static bool IsJumpjetCarryallInUse();
 
 	virtual void LoadFromINIFile(CCINIClass* pINI) override;
 	virtual void LoadFromStream(PhobosStreamReader& Stm) override;

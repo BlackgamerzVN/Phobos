@@ -10,6 +10,7 @@
 #include "Utilities/AresHelper.h"
 #include "Utilities/GeneralUtils.h"
 #include "Utilities/Parser.h"
+#include <Ext/UnitType/Body.h>
 
 #ifndef IS_RELEASE_VER
 bool HideWarning = false;
@@ -387,7 +388,13 @@ void Phobos::ApplyOptimizations()
 		Patch::Apply_RAW(0x64D575, { 0x0F, 0x8F, 0xD5, 0x00, 0x00, 0x00 });
 		Patch::Apply_RAW(0x64D5C5, { 0x8A, 0x44, 0x24, 0x13, 0x84, 0xC0 });
 		Patch::Apply_RAW(0x51BFA2, { 0x85, 0x99, 0x40, 0x01, 0x00, 0x00 });
-		Patch::Apply_RAW(0x73F0A7, { 0x8B, 0xD9, 0x8B, 0x8C, 0x24, 0x88, 0x00, 0x00, 0x00 });
+
+		// A jumpjet carryall needs this one to reach the cell its pickup target stands in,
+		// so it has to survive whatever BalloonHoverPathingFix is set to. Mods that do not
+		// use the feature still get the hook removed.
+		if (!UnitTypeExt::IsJumpjetCarryallInUse())
+			Patch::Apply_RAW(0x73F0A7, { 0x8B, 0xD9, 0x8B, 0x8C, 0x24, 0x88, 0x00, 0x00, 0x00 });
+
 		Patch::Apply_RAW(0x4D62C0, { 0x8A, 0x88, 0x95, 0x06, 0x00, 0x00 });
 	}
 

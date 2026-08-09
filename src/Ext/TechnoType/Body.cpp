@@ -1162,6 +1162,12 @@ void TechnoTypeExt::LoadFromINIFile(CCINIClass* const pINI)
 	// Ares 2.0
 	this->Passengers_BySize.Read(exINI, pSection, "Passengers.BySize");
 
+	// Jumpjet carryall, cargo side. Ares' Carryall.Allowed acts as the default so
+	// types already configured for aircraft carryalls behave consistently.
+	this->JumpjetCarryall_Allowed.Read(exINI, pSection, "Carryall.Allowed");
+	this->JumpjetCarryall_Allowed.Read(exINI, pSection, "JumpjetCarryall.Allowed");
+	this->JumpjetCarryall_Offset.Read(exINI, pSection, "JumpjetCarryall.Offset");
+
 	// Ares 3.0
 	this->Unsellable.Read(exINI, pSection, "Unsellable");
 
@@ -1631,6 +1637,8 @@ void TechnoTypeExt::Serialize(T& Stm)
 		.Process(this->NoQueueUpToEnter_BoardDistance)
 		.Process(this->NoQueueUpToUnload)
 		.Process(this->Passengers_BySize)
+		.Process(this->JumpjetCarryall_Allowed)
+		.Process(this->JumpjetCarryall_Offset)
 
 		.Process(this->RateDown_Delay)
 		.Process(this->RateDown_Reset)
