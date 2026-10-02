@@ -52,7 +52,6 @@ public:
 	virtual TrajectoryCheckReturnType OnAITargetCoordCheck(BulletClass* pBullet) = 0;
 	virtual TrajectoryCheckReturnType OnAITechnoCheck(BulletClass* pBullet, TechnoClass* pTechno) = 0;
 	virtual bool ShouldSkipBridgeCheck() const { return false; }
-	virtual bool ShouldSkipRangedCheck() const { return true; } // Whether to skip is declared as the trajectory's own policy.
 };
 
 /*

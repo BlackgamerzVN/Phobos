@@ -33,8 +33,6 @@ public:
 		return static_cast<TechnoTypeClass*>(this->GetAttachedObject());
 	}
 
-	DynamicVectorClass<TechnoClass*> Array;
-
 	Valueable<bool> HealthBar_Hide;
 	Valueable<bool> HealthBar_HidePips;
 	Valueable<bool> HealthBar_Permanent;
@@ -42,14 +40,15 @@ public:
 	Valueable<CSFText> UIDescription;
 	Valueable<bool> LowSelectionPriority;
 	Valueable<bool> LowDeployPriority;
-	Valueable<int> TypeCyclePriority;
-	Valueable<bool> HighDeployPriority;
-	ValueableVector<TechnoTypeClass*> DeployForbidTypes;
+	PhobosFixedString<0x20> GroupAs;
 	std::vector<PhobosFixedString<0x20>> WeaponGroupAs;
+	Valueable<int> RadarJamRadius;
 	Nullable<AffectedHouse> RadarJamHouses;
 	Nullable<int> RadarJamDelay;
 	ValueableVector<BuildingTypeClass*> RadarJamAffect;
 	ValueableVector<BuildingTypeClass*> RadarJamIgnore;
+	Nullable<int> InhibitorRange;
+	Nullable<int> DesignatorRange;
 	Valueable<float> FactoryPlant_Multiplier;
 	Valueable<Leptons> MindControlRangeLimit;
 	Nullable<bool> MindControl_IgnoreSize;
@@ -107,9 +106,6 @@ public:
 	Valueable<bool> AutoDeath_TechnosExist_Any;
 	Nullable<bool> AutoDeath_TechnosExist_AllowLimboed;
 	Valueable<AffectedHouse> AutoDeath_TechnosExist_Houses;
-	Valueable<PowerStatus> AutoDeath_PlayerPowerState;
-	Valueable<int> AutoDeath_PlayerMoney_Max;
-	Valueable<int> AutoDeath_PlayerMoney_Min;
 
 	NullableIdx<VocClass> SellSound;
 	NullableIdx<VoxClass> EVA_Sold;
@@ -162,7 +158,6 @@ public:
 	Nullable<bool> OpenTopped_CheckTransportDisableWeapons;
 	Nullable<bool> OpenTopped_DecloakToFire;
 	Nullable<bool> OpenTopped_FireWhileMoving;
-	Nullable<bool> OpenTopped_FireWhileMoving_BasedOnDestination;
 	Nullable<int> OpenTransport_RangeBonus;
 	Nullable<float> OpenTransport_DamageMultiplier;
 	Nullable<bool> OpenTransport_FireWhileMoving;
@@ -173,6 +168,9 @@ public:
 	Valueable<bool> NoSecondaryWeaponFallback;
 	Valueable<bool> NoSecondaryWeaponFallback_AllowAA;
 	Nullable<bool> AllowWeaponSelectAgainstWalls;
+
+	Valueable<int> NoAmmoWeapon;
+	Valueable<int> NoAmmoAmount;
 
 	Nullable<bool> JumpjetRotateOnCrash;
 	Nullable<int> ShadowSizeCharacteristicHeight;
@@ -252,6 +250,7 @@ public:
 	Nullable<Point2D> SpawnsPipSize;
 	Valueable<Point2D> SpawnsPipOffset;
 
+	Valueable<TechnoTypeClass*> Convert_Deploy; // Ares
 	Valueable<TechnoTypeClass*> Convert_Undeploy;
 	Valueable<TechnoTypeClass*> Convert_HumanToComputer;
 	Valueable<TechnoTypeClass*> Convert_ComputerToHuman;
@@ -283,6 +282,7 @@ public:
 	Nullable<bool> NoQueueUpToEnter;
 	Nullable<int> NoQueueUpToEnter_BoardDistance;
 	Nullable<bool> NoQueueUpToUnload;
+	Valueable<bool> Passengers_BySize;
 
 	// Jumpjet carryall, cargo side (see UnitTypeExt for the carrier side).
 	Nullable<bool> JumpjetCarryall_Allowed;
@@ -297,13 +297,6 @@ public:
 	Nullable<bool> NoRearm_Temporal;
 	Nullable<bool> NoReload_UnderEMP;
 	Nullable<bool> NoReload_Temporal;
-
-	std::bitset<AdditionalAbilityCount> AdditionalVeteranAbilities;
-	std::bitset<AdditionalAbilityCount> AdditionalEliteAbilities;
-	Nullable<double> VeteranReload;
-	Nullable<double> VeteranEmptyReload;
-	Nullable<double> VeteranRange;
-	Nullable<double> VeteranCritChance;
 
 	Nullable<AnimTypeClass*> Wake;
 	Nullable<AnimTypeClass*> Wake_Grapple;
@@ -444,48 +437,9 @@ public:
 	Valueable<double> Convert_Health_BelowPercent;
 	Nullable<TechnoTypeClass*> Convert_Health;
 
-	Nullable<bool> ExitThroughRoof;
-	Valueable<bool> PsychicDetectable;
-
-	ValueableVector<AnimTypeClass*> CloakAnims;
-	ValueableVector<AnimTypeClass*> DecloakAnims;
-	Nullable<bool> Cloak_KickOutParasite;
-
-	int SubterraneanSpeed;
-	Nullable<int> SubterraneanHeight;
-
-	NullableIdx<VocClass> VoiceEnterGrinder;
-
-	Nullable<AffectedHouse> RevealHouses;
-
-	ValueableVector<int> DefaultToGuardArea_Modes;
-	ValueableVector<int> DefaultToGuardArea_AIModes;
-
-	// Ares 0.2
-	Valueable<int> RadarJamRadius;
-
-	// Ares 0.9
-	Nullable<int> InhibitorRange;
-	Nullable<int> DesignatorRange;
-
-	// Ares 0.A
-	PhobosFixedString<0x20> GroupAs;
-
-	// Ares 0.C
-	Valueable<int> NoAmmoWeapon;
-	Valueable<int> NoAmmoAmount;
-
-	// Ares 2.0
-	Valueable<bool> Passengers_BySize;
-	Valueable<TechnoTypeClass*> Convert_Deploy;
-
-	// Ares 3.0
-	Nullable<bool> Unsellable;
-	Nullable<bool> KeepAlive;
+	Nullable<bool> Unsellable; // Ares 3.0
 
 	TechnoTypeExt(TechnoTypeClass* OwnerObject) : ObjectTypeExt(OwnerObject)
-		, Array {}
-
 		, HealthBar_Hide { false }
 		, HealthBar_HidePips { false }
 		, HealthBar_Permanent { false }
@@ -493,14 +447,15 @@ public:
 		, UIDescription {}
 		, LowSelectionPriority { false }
 		, LowDeployPriority { false }
-		, TypeCyclePriority { 0 }
-		, HighDeployPriority { false }
-		, DeployForbidTypes {}
+		, GroupAs { NONE_STR }
 		, WeaponGroupAs {}
+		, RadarJamRadius { 0 }
 		, RadarJamHouses {}
 		, RadarJamDelay {}
 		, RadarJamAffect {}
 		, RadarJamIgnore {}
+		, InhibitorRange {}
+		, DesignatorRange { }
 		, FactoryPlant_Multiplier { 1.0f }
 		, MindControlRangeLimit {}
 		, MindControl_IgnoreSize {}
@@ -572,7 +527,6 @@ public:
 		, OpenTopped_CheckTransportDisableWeapons {}
 		, OpenTopped_DecloakToFire {}
 		, OpenTopped_FireWhileMoving {}
-		, OpenTopped_FireWhileMoving_BasedOnDestination {}
 		, OpenTransport_RangeBonus {}
 		, OpenTransport_DamageMultiplier {}
 		, OpenTransport_FireWhileMoving {}
@@ -582,6 +536,8 @@ public:
 		, NoSecondaryWeaponFallback { false }
 		, NoSecondaryWeaponFallback_AllowAA { false }
 		, AllowWeaponSelectAgainstWalls {}
+		, NoAmmoWeapon { -1 }
+		, NoAmmoAmount { 0 }
 		, JumpjetRotateOnCrash {}
 		, ShadowSizeCharacteristicHeight { }
 
@@ -602,9 +558,6 @@ public:
 		, AutoDeath_TechnosExist_Any { true }
 		, AutoDeath_TechnosExist_AllowLimboed {}
 		, AutoDeath_TechnosExist_Houses { AffectedHouse::Owner }
-		, AutoDeath_PlayerPowerState { PowerStatus::None }
-		, AutoDeath_PlayerMoney_Max { -1 }
-		, AutoDeath_PlayerMoney_Min { -1 }
 
 		, SellSound {}
 		, EVA_Sold {}
@@ -697,6 +650,7 @@ public:
 		, DroppodType {}
 		, TiberiumEaterType {}
 
+		, Convert_Deploy { }
 		, Convert_Undeploy { }
 		, Convert_HumanToComputer { }
 		, Convert_ComputerToHuman { }
@@ -741,13 +695,6 @@ public:
 		, NoRearm_Temporal {}
 		, NoReload_UnderEMP {}
 		, NoReload_Temporal {}
-
-		, AdditionalVeteranAbilities {}
-		, AdditionalEliteAbilities {}
-		, VeteranReload {}
-		, VeteranEmptyReload {}
-		, VeteranRange {}
-		, VeteranCritChance {}
 
 		, Wake { }
 		, Wake_Grapple { }
@@ -862,6 +809,8 @@ public:
 
 		, JumpjetClimbIgnoreBuilding {}
 
+		, Unsellable {}
+
 		, ExtraThreat_Enabled { false }
 		, ExtraThreat_IsThreat {}
 		, AlwaysConsideredThreat { false }
@@ -875,46 +824,6 @@ public:
 		, Convert_Health_AbovePercent { -1.0 }
 		, Convert_Health_BelowPercent { -1.0 }
 		, Convert_Health {}
-
-		, PsychicDetectable { true }
-
-		, ExitThroughRoof {}
-
-		, CloakAnims {}
-		, DecloakAnims {}
-		, Cloak_KickOutParasite {}
-
-		, SubterraneanSpeed { -1 }
-		, SubterraneanHeight {}
-
-		, VoiceEnterGrinder {}
-
-		, RevealHouses {}
-
-		, DefaultToGuardArea_Modes {}
-		, DefaultToGuardArea_AIModes {}
-
-		// Ares 0.2
-		, RadarJamRadius { 0 }
-
-		// Ares 0.9
-		, InhibitorRange {}
-		, DesignatorRange {}
-			
-		// Ares 0.A
-		, GroupAs { NONE_STR }
-			
-		// Ares 0.C
-		, NoAmmoWeapon { -1 }
-		, NoAmmoAmount { 0 }
-			
-		// Ares 2.0
-		, Passengers_BySize { true }
-		, Convert_Deploy { }
-
-		// Ares 3.0
-		, Unsellable {}
-		, KeepAlive {}
 	{ }
 
 	virtual ~TechnoTypeExt() = default;
@@ -926,7 +835,6 @@ public:
 	void ApplyTurretOffset(Matrix3D* mtx, double factor = 1.0);
 	void CalculateSpawnerRange();
 	bool IsSecondary(int nWeaponIndex) const;
-	const std::string GetGunnerID(int idx) const;
 
 	int SelectForceWeapon(TechnoClass* pThis, AbstractClass* pTarget) const;
 	int SelectMultiWeapon(TechnoClass* const pThis, AbstractClass* const pTarget) const;

@@ -27,13 +27,6 @@ public:
 	std::vector<std::vector<CoordStruct>> DeployedWeaponBurstFLHs;
 	std::vector<std::vector<CoordStruct>> EliteDeployedWeaponBurstFLHs;
 	Nullable<bool> InfantryAutoDeploy;
-	Nullable<PartialVector2D<double>> IdleActionFrequency;
-
-	// Per-sequence animation rates read from the infantry's art section
-	std::vector<int> CustomSequenceRates;
-
-	// Per-sequence game-speed normalization flags read from the infantry's art section
-	std::vector<int> CustomSequenceNormalized;
 
 	explicit InfantryTypeExt(InfantryTypeClass* const OwnerObject) : TechnoTypeExt(OwnerObject)
 		, Slaved_OwnerWhenMasterKilled { SlaveChangeOwnerType::Killer }
@@ -48,9 +41,6 @@ public:
 		, DeployedPrimaryFireFLH {}
 		, DeployedSecondaryFireFLH {}
 		, InfantryAutoDeploy {}
-		, CustomSequenceRates(42, -1)
-		, CustomSequenceNormalized(42, -1)
-		, IdleActionFrequency {}
 	{ }
 
 	InfantryTypeClass* OwnerObject() const

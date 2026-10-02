@@ -1,7 +1,5 @@
 #include "Body.h"
 
-#include <Utilities/SequenceRates.h>
-
 InfantryTypeExt::ExtContainer InfantryTypeExt::ExtMap;
 
 // =============================
@@ -35,25 +33,6 @@ void InfantryTypeExt::LoadFromINIFile(CCINIClass* const pINI)
 	this->ProneSecondaryFireFLH.Read(exArtINI, pArtSection, "ProneSecondaryFireFLH");
 	this->DeployedPrimaryFireFLH.Read(exArtINI, pArtSection, "DeployedPrimaryFireFLH");
 	this->DeployedSecondaryFireFLH.Read(exArtINI, pArtSection, "DeployedSecondaryFireFLH");
-
-	// Per-sequence animation rates
-	char sequenceSection[0x20];
-	const char* pRateSection = pArtSection;
-	if (pArtINI->ReadString(pArtSection, "Sequence", "", sequenceSection, sizeof(sequenceSection)) > 0)
-		pRateSection = sequenceSection;
-
-	for (size_t i = 0; i < SequenceRates::Entries.size(); ++i)
-	{
-		char key[64];
-		std::snprintf(key, sizeof(key), "%sRate", SequenceRates::Entries[i].Name);
-		exArtINI.ReadInteger(pRateSection, key, &this->CustomSequenceRates[i]);
-
-		bool normalized;
-		std::snprintf(key, sizeof(key), "%sNormalized", SequenceRates::Entries[i].Name);
-		if (exArtINI.ReadBool(pRateSection, key, &normalized))
-			this->CustomSequenceNormalized[i] = normalized ? 1 : 0;
-	}
-	this->IdleActionFrequency.Read(exINI, pSection, "IdleActionFrequency");
 }
 
 template <typename T>
@@ -76,9 +55,6 @@ void InfantryTypeExt::Serialize(T& Stm)
 		.Process(this->DeployedWeaponBurstFLHs)
 		.Process(this->EliteDeployedWeaponBurstFLHs)
 		.Process(this->InfantryAutoDeploy)
-		.Process(this->CustomSequenceRates)
-		.Process(this->CustomSequenceNormalized)
-		.Process(this->IdleActionFrequency)
 		;
 }
 

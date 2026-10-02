@@ -1,6 +1,7 @@
 #include <Ext/Aircraft/Body.h>
 #include <Ext/Anim/Body.h>
 #include <Ext/Building/Body.h>
+#include <Ext/BuildingType/Body.h>
 #include <Ext/House/Body.h>
 #include <Ext/Infantry/Body.h>
 #include <Ext/Unit/Body.h>
@@ -19,8 +20,6 @@ TechnoExt::~TechnoExt()
 	auto const pThis = this->OwnerObject();
 	// Besides BuildingClass, calling pThis->WhatAmI() here will only result in AbstractType::None
 	auto const whatAmI = pType->WhatAmI();
-
-	pTypeExt->Array.Remove(pThis);
 
 	if (pTypeExt->AutoDeath_Behavior.isset())
 	{
@@ -172,23 +171,6 @@ void TechnoExt::SyncInvulnerability(TechnoClass* pFrom, TechnoClass* pTo)
 			pTo->ForceShielded = isForceShielded;
 		}
 	}
-}
-
-bool TechnoExt::HasAdditionalAbility(TechnoClass* pThis, AdditionalAbility ability)
-{
-	if (!pThis || (!pThis->Veterancy.IsVeteran() && !pThis->Veterancy.IsElite()))
-		return false;
-
-	const auto index = static_cast<size_t>(ability);
-	const auto pTypeExt = TechnoExt::Fetch(pThis)->TypeExtData;
-
-	if (pThis->Veterancy.IsElite())
-	{
-		return pTypeExt->AdditionalVeteranAbilities.test(index)
-			|| pTypeExt->AdditionalEliteAbilities.test(index);
-	}
-
-	return pTypeExt->AdditionalVeteranAbilities.test(index);
 }
 
 double TechnoExt::GetCurrentSpeedMultiplier(FootClass* pThis)
@@ -476,32 +458,43 @@ bool TechnoExt::ConvertToType(FootClass* pThis, TechnoTypeClass* pToType)
 	return true;
 }
 
-bool TechnoExt::IsTypeImmune(TechnoClass* pThis, TechnoTypeClass* pType, TechnoClass* pSource)
+bool TechnoExt::IsTypeImmune(TechnoClass* pThis, TechnoClass* pSource)
 {
-	if (!pSource || !pType->TypeImmune)
+	if (!pThis || !pSource)
 		return false;
 
-	if (pThis->Owner == pSource->Owner && pType == pSource->GetTechnoType())
+	auto const pType = pThis->GetTechnoType();
+
+	if (!pType->TypeImmune)
+		return false;
+
+	if (pType == pSource->GetTechnoType() && pThis->Owner == pSource->Owner)
 		return true;
 
 	return false;
 }
 
-// Gets whether or not techno has listed AttachEffect types active on it
-bool TechnoExt::ExtData::HasAttachedEffects(std::vector<AttachEffectTypeClass*> const& attachEffectTypes, bool requireAll, bool ignoreSameSource, bool sameSourceOnly,
-	TechnoClass* pInvoker, AbstractClass* pSource, std::vector<int> const* minCounts, std::vector<int> const* maxCounts, bool requireAnims, AffectedHouse affectedHouse) const
+/// <summary>
+/// Gets whether or not techno has listed AttachEffect types active on it
+/// </summary>
+/// <param name="attachEffectTypes">Attacheffect types.</param>
+/// <param name="requireAll">Whether or not to require all listed types to be present or if only one will satisfy the check.</param>
+/// <param name="ignoreSameSource">Ignore AttachEffects that come from set invoker and source.</param>
+/// <param name="pInvoker">Invoker Techno used for same source check.</param>
+/// <param name="pSource">Source AbstractClass instance used for same source check.</param>
+/// <returns>True if techno has active AttachEffects that satisfy the source, false if not.</returns>
+bool TechnoExt::HasAttachedEffects(std::vector<AttachEffectTypeClass*> attachEffectTypes, bool requireAll, bool ignoreSameSource,
+	TechnoClass* pInvoker, AbstractClass* pSource, std::vector<int> const* minCounts, std::vector<int> const* maxCounts) const
 {
 	unsigned int foundCount = 0;
 	unsigned int typeCounter = 1;
-	const bool needHouseCheck = pInvoker && affectedHouse != AffectedHouse::All;
-	ignoreSameSource = ignoreSameSource && pInvoker && pSource;
-	sameSourceOnly = sameSourceOnly && pInvoker && pSource;
+	const bool checkSource = ignoreSameSource && pInvoker && pSource;
 
-	for (auto const& pType : attachEffectTypes)
+	for (auto const& type : attachEffectTypes)
 	{
-		if (pType->Cumulative)
+		if (type->Cumulative)
 		{
-			const int cumulativeCount = this->GetAttachedEffectCumulativeCount(pType, ignoreSameSource, sameSourceOnly, pInvoker, pSource, requireAnims, affectedHouse);
+			const int cumulativeCount = this->GetAttachedEffectCumulativeCount(type, ignoreSameSource, pInvoker, pSource);
 			bool matched = cumulativeCount > 0;
 			const unsigned int minSize = minCounts ? minCounts->size() : 0;
 			const unsigned int maxSize = maxCounts ? maxCounts->size() : 0;
@@ -531,17 +524,9 @@ bool TechnoExt::ExtData::HasAttachedEffects(std::vector<AttachEffectTypeClass*> 
 		{
 			for (auto const& attachEffect : this->AttachedEffects)
 			{
-				const auto type = attachEffect->GetType();
-
-				if (type == pType && attachEffect->IsActive() && (!requireAnims || !type->HasAnim() || attachEffect->HasAnim()))
+				if (attachEffect->GetType() == type && attachEffect->IsActive())
 				{
-					if (ignoreSameSource && attachEffect->IsFromSource(pInvoker, pSource))
-						continue;
-
-					if (sameSourceOnly && !attachEffect->IsFromSource(pInvoker, pSource))
-						continue;
-
-					if (needHouseCheck && !EnumFunctions::CanTargetHouse(affectedHouse, pInvoker->Owner, attachEffect->GetInvoker() ? attachEffect->GetInvoker()->Owner : attachEffect->GetInvokerHouse()))
+					if (checkSource && attachEffect->IsFromSource(pInvoker, pSource))
 						continue;
 
 					// Only need to find one match, can stop here.
@@ -567,25 +552,24 @@ bool TechnoExt::ExtData::HasAttachedEffects(std::vector<AttachEffectTypeClass*> 
 	return false;
 }
 
-// Gets how many counts of same cumulative AttachEffect type instance techno has active on it.
-int TechnoExt::GetAttachedEffectCumulativeCount(AttachEffectTypeClass* pAttachEffectType, bool ignoreSameSource, bool sameSourceOnly, TechnoClass* pInvoker, AbstractClass* pSource, bool requireAnims, AffectedHouse affectedHouse) const
+/// <summary>
+/// Gets how many counts of same cumulative AttachEffect type instance techno has active on it.
+/// </summary>
+/// <param name="pAttachEffectType">AttachEffect type.</param>
+/// <param name="ignoreSameSource">Ignore AttachEffects that come from set invoker and source.</param>
+/// <param name="pInvoker">Invoker Techno used for same source check.</param>
+/// <param name="pSource">Source AbstractClass instance used for same source check.</param>
+/// <returns>Number of active cumulative AttachEffect type instances on the techno. 0 if the AttachEffect type is not cumulative.</returns>
+int TechnoExt::GetAttachedEffectCumulativeCount(AttachEffectTypeClass* pAttachEffectType, bool ignoreSameSource, TechnoClass* pInvoker, AbstractClass* pSource) const
 {
 	unsigned int foundCount = 0;
-	const bool needHouseCheck = pInvoker && affectedHouse != AffectedHouse::All;
+	const bool checkSource = ignoreSameSource && pInvoker && pSource;
 
 	for (auto const& attachEffect : this->AttachedEffects)
 	{
-		const auto type = attachEffect->GetType();
-
-		if (type == pAttachEffectType && attachEffect->IsActive() && (!requireAnims || !type->HasAnim() || attachEffect->HasAnim()))
+		if (attachEffect->GetType() == pAttachEffectType && attachEffect->IsActive())
 		{
-			if (ignoreSameSource && attachEffect->IsFromSource(pInvoker, pSource))
-				continue;
-
-			if (sameSourceOnly && !attachEffect->IsFromSource(pInvoker, pSource))
-				continue;
-
-			if (needHouseCheck && !EnumFunctions::CanTargetHouse(affectedHouse, pInvoker->Owner, attachEffect->GetInvoker() ? attachEffect->GetInvoker()->Owner : attachEffect->GetInvokerHouse()))
+			if (checkSource && attachEffect->IsFromSource(pInvoker, pSource))
 				continue;
 
 			foundCount++;
@@ -942,7 +926,7 @@ struct DummyExtHere
 	char _pad0[0x50];
 	CDTimerClass DisableWeaponsTimer;
 	char _pad1[0x40];
-	bool DriverKilled;
+	bool DriverKilled; 
 };
 
 struct DummyTypeExtHere
@@ -1176,7 +1160,6 @@ void TechnoExt::Serialize(T& Stm)
 {
 	Stm
 		.Process(this->TypeExtData)
-		.Process(this->RandomFactor)
 		.Process(this->Shield)
 		.Process(this->LaserTrails)
 		.Process(this->AttachedEffects)
@@ -1221,8 +1204,8 @@ void TechnoExt::Serialize(T& Stm)
 		.Process(this->HoverShutdown)
 		.Process(this->LastTargetCrd)
 		.Process(this->LastTargetCrdClearTimer)
-		.Process(this->AutoDeathFlag)
-		.Process(this->PreventCrewEscape)
+		.Process(this->ShouldBeDead)
+		.Process(this->PreventCrew)
 		;
 }
 

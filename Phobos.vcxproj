@@ -1,5 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ShowAllFiles>true</ShowAllFiles>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DevBuild|Win32'">
+    <ClCompile>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <PropertyGroup Label="Globals">
     <ProjectName>Phobos</ProjectName>
     <RootNamespace>Phobos</RootNamespace>
@@ -21,7 +39,6 @@
   <!-- Compiled files -->
   <ItemGroup>
     <!-- src/ -->
-    <ClCompile Include="src\Ext\TeamType\Hooks.cpp" />
     <ClCompile Include="src\Phobos.COM.cpp" />
     <ClCompile Include="src\Phobos.cpp" />
     <ClCompile Include="src\Phobos.CRT.cpp" />
@@ -33,8 +50,6 @@
     <ClCompile Include="src\Blowfish\Hooks.Blowfish.cpp" />
     <!-- src\Commands -->
     <ClCompile Include="src\Commands\Commands.cpp" />
-    <ClCompile Include="src\Commands\CycleSelection.cpp" />
-    <ClCompile Include="src\Commands\CycleTypeSelection.cpp" />
     <ClCompile Include="src\Commands\DamageDisplay.cpp" />
     <ClCompile Include="src\Commands\DeselectObject.cpp" />
     <ClCompile Include="src\Commands\DeselectObject5.cpp" />
@@ -226,7 +241,6 @@
     <!-- src\Ext\WeaponType -->
     <ClCompile Include="src\Ext\WeaponType\Body.cpp" />
     <ClCompile Include="src\Ext\WeaponType\Hooks.cpp" />
-    <ClCompile Include="src\Ext\WeaponType\Hooks.Bomb.cpp" />
     <ClCompile Include="src\Ext\WeaponType\Hooks.DiskLaserRadius.cpp" />
     <!-- src\Interop -->
     <ClCompile Include="src\Interop\AttachEffect.cpp" />
@@ -313,8 +327,6 @@
     <ClInclude Include="src\Blowfish\blowfish.h" />
     <!-- src\Commands\ -->
     <ClInclude Include="src\Commands\Commands.h" />
-    <ClInclude Include="src\Commands\CycleSelection.h" />
-    <ClInclude Include="src\Commands\CycleTypeSelection.h" />
     <ClInclude Include="src\Commands\DamageDisplay.h" />
     <ClInclude Include="src\Commands\DeselectObject.h" />
     <ClInclude Include="src\Commands\DeselectObject5.h" />

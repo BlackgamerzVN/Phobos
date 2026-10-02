@@ -65,15 +65,12 @@ bool TActionExt::Execute(TActionClass* pThis, HouseClass* pHouse, ObjectClass* p
 
 	case PhobosTriggerAction::ToggleMCVRedeploy:
 		return TActionExt::ToggleMCVRedeploy(pThis, pHouse, pObject, pTrigger, location);
+	case PhobosTriggerAction::SetDropCrate:
+		return TActionExt::SetDropCrate(pThis, pHouse, pObject, pTrigger, location);
 	case PhobosTriggerAction::UndeployToWaypoint:
 		return TActionExt::UndeployToWaypoint(pThis, pHouse, pObject, pTrigger, location);
 	case PhobosTriggerAction::SetFollowsIndexForVehicle:
 		return TActionExt::SetFollowsIndexForVehicle(pThis, pHouse, pObject, pTrigger, location);
-	case PhobosTriggerAction::SetMissionTimer:
-		return TActionExt::SetMissionTimer(pThis, pHouse, pObject, pTrigger, location);
-
-	case PhobosTriggerAction::SetDropCrate:
-		return TActionExt::SetDropCrate(pThis, pHouse, pObject, pTrigger, location);
 
 	case PhobosTriggerAction::EditAngerNode:
 		return TActionExt::EditAngerNode(pThis, pHouse, pObject, pTrigger, location);
@@ -243,7 +240,7 @@ bool TActionExt::BinaryOperation(TActionClass* pThis, HouseClass* pHouse, Object
 		case 5: { nCurrentValue %= nOptValue; break; }
 		case 6: { nCurrentValue <<= nOptValue; break; }
 		case 7: { nCurrentValue >>= nOptValue; break; }
-		case 8: { nCurrentValue = ~nCurrentValue; break; }
+		case 8: { nCurrentValue = nOptValue; break; }
 		case 9: { nCurrentValue ^= nOptValue; break; }
 		case 10: { nCurrentValue |= nOptValue; break; }
 		case 11: { nCurrentValue &= nOptValue; break; }
@@ -316,7 +313,7 @@ bool TActionExt::RunSuperWeaponAt(TActionClass* pThis, int X, int Y)
 			{
 				if (!pHouse->Defeated
 					&& !pHouse->IsObserver()
-					&& !pHouse->IsNeutral())
+					&& !pHouse->Type->MultiplayPassive)
 				{
 					housesList.push_back(pHouse);
 				}
@@ -436,9 +433,13 @@ bool TActionExt::UndeployToWaypoint(TActionClass* const pThis, HouseClass* const
 
 	// Thanks to chaserli for the relevant code!
 	// There should be a more perfect way to do this, but I don't know how.
-	auto canUndeploy = [&](BuildingClass* const pBuilding, const bool isConYard)
+	auto canUndeploy = [&](BuildingClass* const pBuilding)
 	{
-		if (pBuilding->Owner != vHouse
+		auto const pType = pBuilding->Type;
+
+		if (!pType->UndeploysInto
+			|| pBuilding->Owner != vHouse
+			|| (!allBuilding && pType != pBuildingType)
 			|| pBuilding->CurrentMission == Mission::Selling 
 			|| !pBuilding->IsAlive || pBuilding->Health <= 0 || pBuilding->InLimbo)
 		{
@@ -446,52 +447,37 @@ bool TActionExt::UndeployToWaypoint(TActionClass* const pThis, HouseClass* const
 		}
 
 		// verify whether the building's source is LimboDelivery.
-		if (existLimboBuilding && std::find(vectorBegin, vectorEnd, pBuilding) != vectorEnd)
+		if (existLimboBuilding
+			&& std::find(vectorBegin, vectorEnd, pBuilding) != vectorEnd)
+		{
 			return false;
+		}
 
-		// MindControlledBy YURIX(why ? for balance ? )
-		if (isConYard && !RulesExt::Global()->AllowDeployControlledMCV && pBuilding->MindControlledBy)
-			return false;
+		if (pType->ConstructionYard)
+		{
+			// Conyards can't undeploy if MCVRedeploy=no
+			if (!GameModeOptionsClass::Instance.MCVRedeploy)
+				return false;
+			// or MindControlledBy YURIX (why? for balance?)
+			if (!RulesExt::Global()->AllowDeployControlledMCV && pBuilding->MindControlledBy)
+				return false;
+		}
 
 		return true;
 	};
 
-	auto executeUndeploy = [&](BuildingTypeClass* pType)
+	for (const auto pBuilding : BuildingClass::Array)
 	{
-		const bool isConYard = pType->ConstructionYard;
+		if (!canUndeploy(pBuilding))
+			continue;
 
-		// Conyards can't undeploy if MCVRedeploy=no
-		if (isConYard && !GameModeOptionsClass::Instance.MCVRedeploy)
-			return;
+		// Why does having this allow it to undeploy?
+		// Why don't vehicles move when waypoints are placed off the map?
 
-		for (const auto pTechno : TechnoTypeExt::Fetch(pType)->Array)
-		{
-			const auto pBuilding = static_cast<BuildingClass*>(pTechno);
-
-			if (!canUndeploy(pBuilding, isConYard))
-				continue;
-
-			// Why does having this allow it to undeploy?
-			// Why don't vehicles move when waypoints are placed off the map?
-
-			const bool old = std::exchange(VocClass::VoicesEnabled, false);
-			pBuilding->SetArchiveTarget(pCell);
-			pBuilding->Sell(true);
-			VocClass::VoicesEnabled = old;
-		}
-	};
-
-	if (pBuildingType)
-	{
-		executeUndeploy(pBuildingType);
-	}
-	else
-	{
-		for (const auto pType : BuildingTypeClass::Array)
-		{
-			if (pType->UndeploysInto)
-				executeUndeploy(pType);
-		}
+		const bool old = std::exchange(VocClass::VoicesEnabled, false);
+		pBuilding->SetArchiveTarget(pCell);
+		pBuilding->Sell(true);
+		VocClass::VoicesEnabled = old;
 	}
 
 	return true;
@@ -499,46 +485,39 @@ bool TActionExt::UndeployToWaypoint(TActionClass* const pThis, HouseClass* const
 
 bool TActionExt::SetFollowsIndexForVehicle(TActionClass* pThis, HouseClass* pHouse, ObjectClass* pObject, TriggerClass* pTrigger, CellStruct const& location)
 {
-	const int followerIndex = pThis->Param3;
+	int followerIndex = pThis->Param3;
 
 	if (followerIndex < 0 || followerIndex >= UnitClass::Array.Count)
 		return false;
 
-	auto const pNewFollower = UnitClass::Array[followerIndex];
-
+	UnitClass* pNewFollower = UnitClass::Array[followerIndex];
 	if (!pNewFollower)
 		return false;
 
-	for (auto const pTechno : UnitClass::Array)
+	for (auto const pTechno : TechnoClass::Array)
 	{
-		const auto pAttachedTag = pTechno->AttachedTag;
-
-		if (!pAttachedTag)
+		if (pTechno->WhatAmI() == AbstractType::BuildingType)
 			continue;
 
-		bool foundTrigger = false;
-		auto pAttachedTrigger = pAttachedTag->FirstTrigger;
-
-		// A tag can link multiple triggers
-		do
-		{
-			if (_stricmp(pAttachedTrigger->Type->ID, pTrigger->Type->ID) == 0)
-				foundTrigger = true;
-
-			pAttachedTrigger = pAttachedTrigger->NextTrigger;
-		}
-		while (pAttachedTrigger && !foundTrigger);
-
-		if (!foundTrigger)
+		FootClass* pFoot = abstract_cast<FootClass*>(pTechno);
+		if (!pFoot)
 			continue;
 
-		if (auto const pOldFollower = pTechno->FollowerCar)
+		if (pFoot->WhatAmI() != AbstractType::Unit)
+			continue;
+
+		if (!pFoot->AttachedTag || !pFoot->AttachedTag->ContainsTrigger(pTrigger))
+			continue;
+
+		UnitClass* pLeader = static_cast<UnitClass*>(pFoot);
+
+		if (UnitClass* pOldFollower = pLeader->FollowerCar)
 		{
 			pOldFollower->IsFollowerCar = false;
-			pTechno->FollowerCar = nullptr;
+			pLeader->FollowerCar = nullptr;
 		}
 
-		for (auto const pOther : UnitClass::Array)
+		for (auto pOther : UnitClass::Array)
 		{
 			if (pOther && pOther->FollowerCar == pNewFollower)
 			{
@@ -547,8 +526,9 @@ bool TActionExt::SetFollowsIndexForVehicle(TActionClass* pThis, HouseClass* pHou
 			}
 		}
 
-		pTechno->FollowerCar = pNewFollower;
+		pLeader->FollowerCar = pNewFollower;
 		pNewFollower->IsFollowerCar = true;
+
 	}
 
 	return true;
@@ -691,7 +671,7 @@ bool TActionExt::SetForceEnemy(TActionClass* pThis, HouseClass* pHouse, ObjectCl
 
 bool TActionExt::SetDropCrate(TActionClass* pThis, HouseClass* pHouse, ObjectClass* pObject, TriggerClass* pTrigger, CellStruct const& location)
 {
-	for (const auto pTechno : TechnoClass::Array)
+	for (auto pTechno : TechnoClass::Array)
 	{
 		const auto pAttachedTag = pTechno->AttachedTag;
 
@@ -793,21 +773,6 @@ bool TActionExt::SetNextScanario(TActionClass* const pThis, HouseClass* const pH
 			_snprintf_s(pScenario->NextScenario, sizeof(pScenario->NextScenario), pText);
 		}
 	}
-
-	return true;
-}
-
-bool TActionExt::SetMissionTimer(TActionClass* const pThis, HouseClass* const pHouse, ObjectClass* const pObject, TriggerClass* const pTrigger, const CellStruct& location)
-{
-	const int type = pThis->Param3;
-	const int reverse = pThis->Param5;
-	ScenarioExt::Global()->MissionTimer_Variable = pThis->Param4;
-
-	if (0 <= type && 4 >= type)
-		ScenarioExt::Global()->MissionTimer_Type = type;
-
-	if (0 <= reverse && 1 >= reverse)
-		ScenarioExt::Global()->MissionTimer_Reverse = (bool)reverse;
 
 	return true;
 }

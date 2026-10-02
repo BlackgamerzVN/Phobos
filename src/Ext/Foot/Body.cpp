@@ -2,13 +2,10 @@
 
 #include <JumpjetLocomotionClass.h>
 
-#include <Ext/Aircraft/Body.h>
 #include <Ext/Anim/Body.h>
-#include <Ext/BulletType/Body.h>
 #include <Ext/House/Body.h>
 #include <Ext/Scenario/Body.h>
 #include <Ext/Unit/Body.h>
-#include <Ext/WeaponType/Body.h>
 #include <Misc/FlyingStrings.h>
 #include <Utilities/AresFunctions.h>
 
@@ -177,8 +174,6 @@ void FootExt::UpdateTypeData(TechnoTypeClass* pCurrentType)
 
 	auto const pNewTypeExt = TechnoTypeExt::Fetch(pCurrentType);
 	this->TypeExtData = pNewTypeExt;
-	pOldTypeExt->Array.Remove(pThis);
-	pNewTypeExt->Array.AddItem(pThis);
 
 	this->UpdateSelfOwnedAttachEffects();
 
@@ -609,6 +604,8 @@ void FootExt::UpdateTypeData(TechnoTypeClass* pCurrentType)
 		pParasiteImUsing = nullptr;
 	}
 
+	auto const abs = pThis->WhatAmI();
+
 	// Update movement sound if still moving while type changed.
 	if (pThis->IsMoveSoundPlaying && pThis->Locomotor->Is_Moving())
 	{
@@ -632,8 +629,6 @@ void FootExt::UpdateTypeData(TechnoTypeClass* pCurrentType)
 			pThis->MoveSoundDelay = 0;
 		}
 	}
-
-	auto const abs = pThis->WhatAmI();
 
 	if (abs == AbstractType::Infantry)
 	{
@@ -724,8 +719,6 @@ void FootExt::UpdateTypeData(TechnoTypeClass* pCurrentType)
 			{
 				const int turnrate = pCurrentType->JumpjetTurnRate >= 127 ? 127 : pCurrentType->JumpjetTurnRate;
 				pJJLoco->Speed = pCurrentType->JumpjetSpeed;
-				this->JumpjetSpeed = pCurrentType->JumpjetSpeed; // keep the cached speed in sync (0x54D138 hook reads it every frame)
-				pJJLoco->MaxSpeed = pCurrentType->JumpjetSpeed;
 				pJJLoco->Climb = pCurrentType->JumpjetClimb;
 				pJJLoco->Accel = pCurrentType->JumpjetAccel;
 				pJJLoco->Crash = pCurrentType->JumpjetCrash;
@@ -815,65 +808,6 @@ void FootExt::UpdateTypeData(TechnoTypeClass* pCurrentType)
 			}
 		}
 	}
-	else
-	{
-		const auto pAircraft = static_cast<AircraftClass*>(pThis);
-		const auto pAircraftExt = AircraftExt::Fetch(pAircraft);
-
-		if (!pAircraft->Type->AirportBound)
-			pAircraft->DockNowHeadingTo = nullptr;
-
-		const auto pNewWeapon = pAircraft->GetWeapon(pAircraft->SelectWeapon(pAircraft->Target))->WeaponType;
-		bool isStrafing = false;
-		bool resetMission = false;
-
-		if (pNewWeapon)
-		{
-			const auto pNewWeaponExt = WeaponTypeExt::Fetch(pNewWeapon);
-
-			if (pNewWeaponExt->Strafing.isset())
-			{
-				isStrafing = pNewWeaponExt->Strafing.Get();
-			}
-			else
-			{
-				const auto pBulletType = pNewWeapon->Projectile;
-
-				if (pBulletType->ROT < 2 && !pBulletType->Inviso && !BulletTypeExt::Fetch(pBulletType)->TrajectoryType)
-					isStrafing = true;
-			}
-
-			if (isStrafing)
-			{
-				if (!pNewWeaponExt->Strafing_TargetCell)
-					pAircraftExt->Strafe_TargetCell = nullptr;
-
-				if (pAircraftExt->Strafe_BombsDroppedThisRound >= pNewWeaponExt->Strafing_Shots.Get(5))
-					resetMission = true;
-			}
-		}
-
-		if (!isStrafing)
-		{
-			pAircraftExt->Strafe_BombsDroppedThisRound = 0;
-			pAircraftExt->Strafe_TargetCell = nullptr;
-		}
-
-		if (!isStrafing || resetMission)
-		{
-			pAircraft->IsLocked = false;
-
-			// mission status might still be incorrect here
-			if (pAircraft->MissionStatus >= (int)AirAttackStatus::FireAtTarget2_Strafe
-				&& pAircraft->MissionStatus <= (int)AirAttackStatus::FireAtTarget5_Strafe)
-			{
-				if (pAircraft->Target && pAircraft->Ammo > 0)
-					pAircraft->MissionStatus = (int)AirAttackStatus::ValidateAZ;
-				else
-					pAircraft->MissionStatus = (int)AirAttackStatus::FlyToPosition;
-			}
-		}
-	}
 
 	// handle AutoTargetOwnPosition
 	if (pOldTypeExt->AutoTargetOwnPosition && !pNewTypeExt->AutoTargetOwnPosition)
@@ -940,8 +874,6 @@ void FootExt::Serialize(T& Stm)
 		.Process(this->LastWarpDistance)
 		.Process(this->JumpjetSpeed)
 		.Process(this->IsInTunnel)
-		.Process(this->IsBurrowed)
-		.Process(this->UndergroundTracked)
 		.Process(this->OriginalPassengerOwner)
 		.Process(this->HasRemainingWarpInDelay)
 		.Process(this->LastWarpInDelay)

@@ -266,18 +266,9 @@ public:
 
 	Nullable<StackingMode> Psychedelic_StackingMode;
 
-	Valueable<bool> PreventCrewEscape;
+	Valueable<bool> PreventCrew;
 	Valueable<bool> PreventPassengerEscape;
 	Valueable<bool> PreventOccupantEscape;
-
-	Valueable<int> Ammo;
-
-	Valueable<bool> IvanBomb_Detonate;
-	Valueable<bool> IvanBomb_Detonate_SameInvokerOnly;
-	Valueable<bool> IvanBomb_Detonate_PenetratesTransport;
-	Valueable<bool> IvanBomb_Detonate_PenetratesGarrison;
-	Valueable<bool> IvanBomb_Detonate_AffectsParasite;
-	ValueableVector<TechnoTypeClass*> IvanBomb_Detonate_AffectTypes;
 
 	// Ares tags
 	// http://ares-developers.github.io/Ares-docs/new/warheads/general.html
@@ -286,13 +277,11 @@ public:
 	Valueable<bool> EffectsRequireVerses;
 	Valueable<bool> Malicious;
 	Nullable<int> Flash_Duration;
-	Valueable<double> Damage_Deployed;
-	Nullable<bool> PreventScatter;
+	Valueable<double> Damage_Deployed { 1.0 };
 
 	double Crit_RandomBuffer;
 	double Crit_CurrentChance;
 	bool Crit_Active;
-	bool InApplyCrit;
 	double ReturnWarhead_RandomBuffer;
 	bool InDamageArea;
 	bool WasDetonatedOnAllMapObjects;
@@ -524,13 +513,10 @@ public:
 		, EffectsRequireVerses { true }
 		, Malicious { true }
 		, Flash_Duration {}
-		, Damage_Deployed { 1.0 }
-		, PreventScatter {}
 
 		, Crit_RandomBuffer { 0.0 }
 		, Crit_CurrentChance { 0.0 }
 		, Crit_Active { false }
-		, InApplyCrit { false }
 		, ReturnWarhead_RandomBuffer { 0.0 }
 		, InDamageArea { true }
 		, WasDetonatedOnAllMapObjects { false }
@@ -575,18 +561,9 @@ public:
 
 		, Psychedelic_StackingMode {}
 
-		, PreventCrewEscape { false }
+		, PreventCrew { false }
 		, PreventPassengerEscape { false }
 		, PreventOccupantEscape { false }
-
-		, Ammo { 0 }
-
-		, IvanBomb_Detonate { false }
-		, IvanBomb_Detonate_SameInvokerOnly { true }
-		, IvanBomb_Detonate_PenetratesTransport { false }
-		, IvanBomb_Detonate_PenetratesGarrison { false }
-		, IvanBomb_Detonate_AffectsParasite { false }
-		, IvanBomb_Detonate_AffectTypes {}
 	{ }
 
 	void ApplyConvert(HouseClass* pHouse, TechnoClass* pTarget);
@@ -628,8 +605,6 @@ private:
 	void ApplyReturnWarhead(HouseClass* pHouse, TechnoClass* pTarget, TechnoClass* Owner);
 	void ApplyPenetratesTransport(TechnoClass* pTarget, TechnoClass* pInvoker, HouseClass* pInvokerHouse, const CoordStruct& coords, int damage, int distance);
 	double GetCritChance(TechnoClass* pFirer) const;
-	void ApplyAmmoModifier(TechnoClass* pTarget);
-	void IvanBombDetonate(TechnoClass* pOwner, TechnoClass* pTarget);
 
 public:
 	class ExtContainer final : public Container<WarheadTypeExt>

@@ -353,14 +353,6 @@ DEFINE_HOOK(0x65B843, RadSiteClass_AI_LevelDelay, 0x6)
 {
 	GET_RADSITE(ESI, GetLevelDelay());
 
-	if (pExt->LightDirty)
-	{
-		if (const auto pLight = pThis->LightSource)
-			pLight->ChangeLevels(pThis->Intensity, pThis->Tint, false);
-
-		pExt->LightDirty = false;
-	}
-
 	R->ECX(output);
 
 	return 0x65B849;

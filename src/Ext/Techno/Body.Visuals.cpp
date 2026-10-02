@@ -167,6 +167,7 @@ void TechnoExt::DrawInsignia(TechnoClass* pThis, Point2D* pLocation, RectangleSt
 
 	VeterancyStruct* pVeterancy = &pThis->Veterancy;
 	auto insigniaFrames = pTechnoTypeExt->InsigniaFrames.Get();
+	int insigniaFrame = insigniaFrames.X;
 	int frameIndex = pTechnoTypeExt->InsigniaFrame.Get(pThis);
 
 	if (pTechnoType->Passengers > 0 && pTechnoTypeExt->Insignia_Passengers.size() > 0)
@@ -214,8 +215,6 @@ void TechnoExt::DrawInsignia(TechnoClass* pThis, Point2D* pLocation, RectangleSt
 			insigniaFrames = frames.Get();
 	}
 
-	int insigniaFrame = insigniaFrames.X;
-
 	if (pVeterancy->IsVeteran())
 	{
 		defaultFrameIndex = !isCustomInsignia ? 14 : defaultFrameIndex;
@@ -241,7 +240,7 @@ void TechnoExt::DrawInsignia(TechnoClass* pThis, Point2D* pLocation, RectangleSt
 			break;
 		case AbstractType::Building:
 			if (RulesExt::Global()->DrawInsignia_AdjustPos_BuildingsAnchor.isset())
-				offset = GetBuildingSelectBracketPosition(pThis, pTechnoType, RulesExt::Global()->DrawInsignia_AdjustPos_BuildingsAnchor) + RulesExt::Global()->DrawInsignia_AdjustPos_Buildings;
+				offset = GetBuildingSelectBracketPosition(pThis, RulesExt::Global()->DrawInsignia_AdjustPos_BuildingsAnchor) + RulesExt::Global()->DrawInsignia_AdjustPos_Buildings;
 			else
 				offset += RulesExt::Global()->DrawInsignia_AdjustPos_Buildings;
 			break;
@@ -267,10 +266,13 @@ Point2D TechnoExt::GetScreenLocation(TechnoClass* pThis)
 	return TacticalClass::Instance->CoordsToClient(pThis->GetCoords()).first;
 }
 
-Point2D TechnoExt::GetFootSelectBracketPosition(TechnoClass* pThis, Anchor anchor, bool isInfantry)
+Point2D TechnoExt::GetFootSelectBracketPosition(TechnoClass* pThis, Anchor anchor)
 {
-	const int length = isInfantry ? 8 : 17;
+	int length = 17;
 	Point2D position = GetScreenLocation(pThis);
+
+	if (pThis->WhatAmI() == AbstractType::Infantry)
+		length = 8;
 
 	RectangleStruct bracketRect =
 	{
@@ -283,9 +285,9 @@ Point2D TechnoExt::GetFootSelectBracketPosition(TechnoClass* pThis, Anchor ancho
 	return anchor.OffsetPosition(bracketRect);
 }
 
-Point2D TechnoExt::GetBuildingSelectBracketPosition(TechnoClass* pThis, TechnoTypeClass* pType, BuildingSelectBracketPosition bracketPosition)
+Point2D TechnoExt::GetBuildingSelectBracketPosition(TechnoClass* pThis, BuildingSelectBracketPosition bracketPosition)
 {
-	const auto pBuildingType = static_cast<BuildingTypeClass*>(pType);
+	const auto pBuildingType = static_cast<BuildingTypeClass*>(pThis->GetTechnoType());
 	Point2D position = GetScreenLocation(pThis);
 	CoordStruct dim2 = CoordStruct::Empty;
 	pBuildingType->Dimension2(&dim2);
@@ -486,9 +488,9 @@ void TechnoExt::ProcessDigitalDisplays(TechnoClass* pThis)
 			maxValue = Math::max(maxValue / divisor, 1);
 		}
 
-		Point2D position = isBuilding
-			? GetBuildingSelectBracketPosition(pThis, pType, pDisplayType->AnchorType_Building)
-			: GetFootSelectBracketPosition(pThis, pDisplayType->AnchorType, isInfantry);
+		Point2D position = whatAmI == AbstractType::Building
+			? GetBuildingSelectBracketPosition(pThis, pDisplayType->AnchorType_Building)
+			: GetFootSelectBracketPosition(pThis, pDisplayType->AnchorType);
 		position.Y += pType->PixelSelectionBracketDelta;
 
 		if (pDisplayType->InfoType == DisplayInfoType::Shield)

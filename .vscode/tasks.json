@@ -78,6 +78,9 @@
           "value": "Debug"
         },
         {
+          "value": "DevBuild"
+        },
+        {
           "value": "Release"
         }
       ],

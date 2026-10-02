@@ -1,5 +1,4 @@
 #include <Ext/House/Body.h>
-#include <Ext/Techno/Body.h>
 #include <Ext/AnimType/Body.h>
 #include <Ext/UnitType/Body.h>
 
@@ -59,34 +58,23 @@ DEFINE_HOOK(0x4AE670, DisplayClass_GetToolTip_EnemyUIName, 0x8)
 	GET(ObjectClass*, pObject, ECX);
 
 	auto pDecidedUIName = pObject->GetUIName();
+	const auto pFoot = generic_cast<FootClass*, true>(pObject);
+	const auto pTechnoType = pObject->GetTechnoType();
 
-	if (!HouseClass::IsCurrentPlayerObserver())
+	if (pFoot && pTechnoType && !pObject->IsDisguised())
 	{
-		if (const auto pFoot = generic_cast<FootClass*, true>(pObject))
+		const auto pOwnerHouse = pFoot->Owner;
+		const bool IsAlly = pOwnerHouse->IsAlliedWith(HouseClass::CurrentPlayer);
+		const bool IsCivilian = (pOwnerHouse == HouseClass::FindCivilianSide()) || pOwnerHouse->IsNeutral();
+		const bool IsObserver = HouseClass::Observer || HouseClass::IsCurrentPlayerObserver();
+
+		if (!IsAlly && !IsCivilian && !IsObserver)
 		{
-			if (!pFoot->IsDisguised())
-			{
-				const auto pOwnerHouse = pFoot->Owner;
-				const bool IsAlly = pOwnerHouse->IsAlliedWith(HouseClass::CurrentPlayer);
+			const auto pTechnoTypeExt = TechnoTypeExt::Fetch(pTechnoType);
 
-				if (!IsAlly && !pOwnerHouse->IsNeutral())
-				{
-					if (const auto pEnemyUIName = TechnoExt::Fetch(pFoot)->TypeExtData->EnemyUIName.Get().Text)
-						pDecidedUIName = pEnemyUIName;
-				}
-			}
-			else if (auto const pType = TechnoTypeExt::GetTechnoType(pFoot->Disguise))
+			if (const auto pEnemyUIName = pTechnoTypeExt->EnemyUIName.Get().Text)
 			{
-				const auto pOwnerHouse = pFoot->Owner;
-				const auto pDisguiseHouse = pFoot->DisguisedAsHouse;
-				const bool IsAlly = pOwnerHouse->IsAlliedWith(HouseClass::CurrentPlayer) || pDisguiseHouse->IsAlliedWith(HouseClass::CurrentPlayer);
-				const bool IsCivilian = pDisguiseHouse && pDisguiseHouse->IsNeutral();
-
-				if (!IsAlly && !IsCivilian)
-				{
-					if (const auto pEnemyUIName = TechnoTypeExt::Fetch(pType)->EnemyUIName.Get().Text)
-						pDecidedUIName = pEnemyUIName;
-				}
+				pDecidedUIName = pEnemyUIName;
 			}
 		}
 	}

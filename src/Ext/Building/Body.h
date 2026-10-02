@@ -15,7 +15,6 @@ public:
 
 	bool DeployedTechno;
 	bool IsCreatedFromMapFile;
-	bool HasPowerFromMapFile;
 	int LimboID;
 	int GrindingWeapon_LastFiredFrame;
 	int GrindingWeapon_AccumulatedCredits;
@@ -29,12 +28,10 @@ public:
 	int TurretAnimFiringFrame;
 	int TurretAnimRateTick;
 	int ConstructionStartFacing;
-	bool IsPlayingRoofProductionAnim;
 
 	BuildingExt(BuildingClass* OwnerObject) : TechnoExt(OwnerObject)
 		, DeployedTechno { false }
 		, IsCreatedFromMapFile { false }
-		, HasPowerFromMapFile { false }
 		, LimboID { -1 }
 		, GrindingWeapon_LastFiredFrame { 0 }
 		, GrindingWeapon_AccumulatedCredits { 0 }
@@ -47,8 +44,6 @@ public:
 		, TurretAnimIdleFrame { 0 }
 		, TurretAnimFiringFrame { -1 }
 		, TurretAnimRateTick { 0 }
-		, ConstructionStartFacing { -1 }
-		, IsPlayingRoofProductionAnim { false }
 	{ }
 
 	// typed owner accessor (shadows the TechnoClass one from the base)

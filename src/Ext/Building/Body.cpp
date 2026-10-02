@@ -590,7 +590,6 @@ void BuildingExt::Serialize(T& Stm)
 	Stm
 		.Process(this->DeployedTechno)
 		.Process(this->IsCreatedFromMapFile)
-		//.Process(this->HasPowerFromMapFile)
 		.Process(this->LimboID)
 		.Process(this->GrindingWeapon_LastFiredFrame)
 		.Process(this->GrindingWeapon_AccumulatedCredits)
@@ -603,8 +602,7 @@ void BuildingExt::Serialize(T& Stm)
 		.Process(this->TurretAnimIdleFrame)
 		.Process(this->TurretAnimFiringFrame)
 		.Process(this->TurretAnimRateTick)
-		.Process(this->ConstructionStartFacing)
-		//.Process(this->IsPlayingRoofProductionAnim) It is set and reset within a same function.
+		.Process(this->ConstructionStartFacing) 
 		;
 }
 

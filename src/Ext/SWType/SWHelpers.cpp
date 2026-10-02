@@ -43,7 +43,7 @@ std::vector<int> SWTypeExt::WeightedRollsHandler(ValueableVector<float>* rolls, 
 // =============================
 // Ares 0.A helpers
 // Inhibitors check
-bool SWTypeExt::IsInhibitor(HouseClass* pOwner, TechnoClass* pTechno, TechnoTypeClass* pType) const
+bool SWTypeExt::IsInhibitor(HouseClass* pOwner, TechnoClass* pTechno) const
 {
 	if (pTechno->IsAlive && pTechno->Health && !pTechno->InLimbo && !pTechno->Deactivated)
 	{
@@ -55,21 +55,25 @@ bool SWTypeExt::IsInhibitor(HouseClass* pOwner, TechnoClass* pTechno, TechnoType
 					return false;
 			}
 
-			return true;
+			return this->SW_AnyInhibitor || this->SW_Inhibitors.Contains(pTechno->GetTechnoType());
 		}
 	}
 
 	return false;
 }
 
-bool SWTypeExt::IsInhibitorEligible(HouseClass* pOwner, const CellStruct& coords, TechnoClass* pTechno, TechnoTypeClass* pType, double range) const
+bool SWTypeExt::IsInhibitorEligible(HouseClass* pOwner, const CellStruct& coords, TechnoClass* pTechno) const
 {
-	if (this->IsInhibitor(pOwner, pTechno, pType))
+	if (this->IsInhibitor(pOwner, pTechno))
 	{
+		const auto pType = pTechno->GetTechnoType();
+		const auto pExt = TechnoTypeExt::Fetch(pType);
+
 		// get the inhibitor's center
 		const auto center = pTechno->GetCenterCoords();
 
 		// has to be closer than the inhibitor range (which defaults to Sight)
+		const double range = (double)pExt->InhibitorRange.Get(pType->Sight);
 		return coords.DistanceFromSquared(CellClass::Coord2Cell(center)) <= range * range;
 	}
 
@@ -78,57 +82,37 @@ bool SWTypeExt::IsInhibitorEligible(HouseClass* pOwner, const CellStruct& coords
 
 bool SWTypeExt::HasInhibitor(HouseClass* pOwner, const CellStruct& coords) const
 {
-	if (this->SW_AnyInhibitor)
-	{
-		for (auto const pType : TechnoTypeClass::Array)
-		{
-			auto const pTypeExt = TechnoTypeExt::Fetch(pType);
+	// does not allow inhibitors
+	if (this->SW_Inhibitors.empty() && !this->SW_AnyInhibitor)
+		return false;
 
-			if (const int range = pTypeExt->InhibitorRange.Get(pType->Sight))
-			{
-				auto const& items = pTypeExt->Array;
-				return std::any_of(items.begin(), items.end(), [=, &coords](TechnoClass* pTechno)
-					{ return this->IsInhibitorEligible(pOwner, coords, pTechno, pType, (double)range); }
-				);
-			}
-		}
-	}
-	else if (this->SW_Inhibitors.size() > 0)
-	{
-		for (auto const pType : this->SW_Inhibitors)
-		{
-			auto const pTypeExt = TechnoTypeExt::Fetch(pType);
-
-			if (const int range = pTypeExt->InhibitorRange.Get(pType->Sight))
-			{
-				auto const& items = pTypeExt->Array;
-				return std::any_of(items.begin(), items.end(), [=, &coords](TechnoClass* pTechno)
-					{ return this->IsInhibitorEligible(pOwner, coords, pTechno, pType, (double)range); }
-				);
-			}
-		}
-	}
-
-	return false;
+	// a single inhibitor in range suffices
+	return std::any_of(TechnoClass::Array.begin(), TechnoClass::Array.end(), [=, &coords](TechnoClass* pTechno)
+		{ return this->IsInhibitorEligible(pOwner, coords, pTechno); }
+	);
 }
 
 // Designators check
-bool SWTypeExt::IsDesignator(HouseClass* pOwner, TechnoClass* pTechno, TechnoTypeClass* pType) const
+bool SWTypeExt::IsDesignator(HouseClass* pOwner, TechnoClass* pTechno) const
 {
 	if (pTechno->Owner == pOwner && pTechno->IsAlive && pTechno->Health && !pTechno->InLimbo && !pTechno->Deactivated)
-		return true;
+		return this->SW_AnyDesignator || this->SW_Designators.Contains(pTechno->GetTechnoType());
 
 	return false;
 }
 
-bool SWTypeExt::IsDesignatorEligible(HouseClass* pOwner, const CellStruct& coords, TechnoClass* pTechno, TechnoTypeClass* pType, double range) const
+bool SWTypeExt::IsDesignatorEligible(HouseClass* pOwner, const CellStruct& coords, TechnoClass* pTechno) const
 {
-	if (this->IsDesignator(pOwner, pTechno, pType))
+	if (this->IsDesignator(pOwner, pTechno))
 	{
+		const auto pType = pTechno->GetTechnoType();
+		const auto pExt = TechnoTypeExt::Fetch(pType);
+
 		// get the designator's center
 		const auto center = pTechno->GetCenterCoords();
 
 		// has to be closer than the designator range (which defaults to Sight)
+		const double range = (double)pExt->DesignatorRange.Get(pType->Sight);
 		return coords.DistanceFromSquared(CellClass::Coord2Cell(center)) <= range * range;
 	}
 
@@ -137,38 +121,13 @@ bool SWTypeExt::IsDesignatorEligible(HouseClass* pOwner, const CellStruct& coord
 
 bool SWTypeExt::HasDesignator(HouseClass* pOwner, const CellStruct& coords) const
 {
-	if (this->SW_AnyDesignator)
-	{
-		for (auto const pType : TechnoTypeClass::Array)
-		{
-			auto const pTypeExt = TechnoTypeExt::Fetch(pType);
+	// does not require designators
+	if (this->SW_Designators.empty() && !this->SW_AnyDesignator)
+		return true;
 
-			if (const int range = pTypeExt->DesignatorRange.Get(pType->Sight))
-			{
-				auto const& items = pTypeExt->Array;
-				return std::any_of(items.begin(), items.end(), [=, &coords](TechnoClass* pTechno)
-					{ return this->IsDesignatorEligible(pOwner, coords, pTechno, pType, (double)range); }
-				);
-			}
-		}
-	}
-	else if (this->SW_Designators.size() > 0)
-	{
-		for (auto const pType : this->SW_Designators)
-		{
-			auto const pTypeExt = TechnoTypeExt::Fetch(pType);
-
-			if (const int range = pTypeExt->DesignatorRange.Get(pType->Sight))
-			{
-				auto const& items = pTypeExt->Array;
-				return std::any_of(items.begin(), items.end(), [=, &coords](TechnoClass* pTechno)
-					{ return this->IsDesignatorEligible(pOwner, coords, pTechno, pType, (double)range); }
-				);
-			};
-		}
-	}
-
-	return true;
+	// a single designator in range suffices
+	return std::any_of(TechnoClass::Array.begin(), TechnoClass::Array.end(), [=, &coords](TechnoClass* pTechno)
+		{ return this->IsDesignatorEligible(pOwner, coords, pTechno); });
 }
 
 bool SWTypeExt::IsLaunchSiteEligible(const CellStruct& Coords, BuildingClass* pBuilding, bool ignoreRange) const
@@ -238,7 +197,7 @@ bool SWTypeExt::IsAvailable(HouseClass* pHouse) const
 			if (pBuildingType && !BuildingTypeExt::Fetch(pBuildingType)->PowersUp_Buildings.empty())
 				return BuildingTypeExt::GetUpgradesAmount(pBuildingType, pHouse) > 0;
 
-			return HouseExt::Fetch(pHouse)->HasOwnedPresentAndLimboed(pType);
+			return HouseExt::Fetch(pHouse)->CountOwnedPresentAndLimboed(pType) > 0;
 		};
 
 	// check whether the optional aux building exists

@@ -456,7 +456,6 @@ void AnimExt::Serialize(T& Stm)
 		.Process(this->FiringAnim_LastFacing)
 		.Process(this->FiringAnim_LastCoords)
 		.Process(this->FirepowerMult)
-		.Process(this->AEDrawOffset)
 		;
 }
 

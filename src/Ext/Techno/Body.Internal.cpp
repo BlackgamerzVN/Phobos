@@ -1,5 +1,4 @@
 #include <Ext/Foot/Body.h>
-#include <Ext/HouseType/Body.h>
 #include <Ext/InfantryType/Body.h>
 
 // Unsorted methods
@@ -134,12 +133,12 @@ CoordStruct TechnoExt::GetBurstFLH(TechnoClass* pThis, int weaponIndex, bool& FL
 	return FLH;
 }
 
-void TechnoExt::InitializeDisplayInfo(TechnoTypeClass* pType)
+void TechnoExt::InitializeDisplayInfo()
 {
 	const auto pThis = this->OwnerObject();
 	const auto pPrimary = pThis->GetWeapon(0)->WeaponType;
 
-	if (pPrimary && pType->LandTargeting != LandTargetingType::Land_Not_OK)
+	if (pPrimary && pThis->GetTechnoType()->LandTargeting != LandTargetingType::Land_Not_OK)
 		pThis->RearmTimer.TimeLeft = pPrimary->ROF;
 	else if (const auto pSecondary = pThis->GetWeapon(1)->WeaponType)
 		pThis->RearmTimer.TimeLeft = pSecondary->ROF;
@@ -150,11 +149,12 @@ void TechnoExt::InitializeDisplayInfo(TechnoTypeClass* pType)
 void TechnoExt::InitializeAttachEffects()
 {
 	auto const pTypeExt = this->TypeExtData;
-	auto const pThis = this->OwnerObject();
-	auto const pOwner = pThis->Owner;
 
-	AttachEffectClass::Attach(pThis, pOwner, pThis, pThis, pTypeExt->AttachEffects, true, true);
-	AttachEffectClass::Attach(pThis, pOwner, pThis, pThis, HouseTypeExt::Fetch(pOwner->Type)->AttachEffects, false, true);
+	if (pTypeExt->AttachEffects.AttachTypes.size() < 1)
+		return;
+
+	auto const pThis = this->OwnerObject();
+	AttachEffectClass::Attach(pThis, pThis->Owner, pThis, pThis, pTypeExt->AttachEffects);
 }
 
 // Gets tint colors for invulnerability, airstrike laser target and berserk, depending on parameters.
@@ -231,12 +231,13 @@ void TechnoExt::ApplyCustomTintValues(TechnoClass* pThis, int& color, int& inten
 }
 
 // This is still not even correct, but let's see how far this can help us
-void TechnoExt::ChangeOwnerMissionFix(FootClass* pThis, TechnoTypeClass* pType)
+void TechnoExt::ChangeOwnerMissionFix(FootClass* pThis)
 {
 	pThis->ShouldScanForTarget = false;
 	pThis->ShouldEnterAbsorber = false;
 	pThis->ShouldEnterOccupiable = false;
 	pThis->ShouldGarrisonStructure = false;
+	auto const pType = pThis->GetTechnoType();
 
 	if (pThis->HasAnyLink() || pType->ResourceGatherer) // Don't want miners to stop
 		return;
