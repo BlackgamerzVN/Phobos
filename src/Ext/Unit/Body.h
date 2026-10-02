@@ -30,8 +30,6 @@ public:
 	CDTimerClass DeployFireTimer;
 	bool KeepTargetOnMove;
 	CDTimerClass SimpleDeployerAnimationTimer;
-	bool IsBurrowed;
-	bool UndergroundTracked;
 
 	std::vector<RecoilData> ExtraTurretRecoil;
 	std::vector<RecoilData> ExtraBarrelRecoil;
@@ -50,8 +48,6 @@ public:
 		, DeployFireTimer {}
 		, KeepTargetOnMove { false }
 		, SimpleDeployerAnimationTimer {}
-		, IsBurrowed { false }
-		, UndergroundTracked { false }
 		, ExtraTurretRecoil {}
 		, ExtraBarrelRecoil {}
 		, JumpjetCarryall_Payload { nullptr }
@@ -63,8 +59,6 @@ public:
 	{ }
 
 	virtual ~UnitExt() override;
-
-	virtual bool IsBurrowedState() const override { return this->IsBurrowed; }
 
 	void UpdateSubterraneanHarvester();
 	void UpdateKeepTargetOnMove();

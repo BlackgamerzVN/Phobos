@@ -12,7 +12,11 @@
 #include "Utilities/Parser.h"
 #include <Ext/UnitType/Body.h>
 
-#ifndef IS_RELEASE_VER
+#include <Ext/Rules/Body.h>
+#include <TiberiumClass.h>
+#include <algorithm>
+
+#ifdef TESTING_BUILD
 bool HideWarning = false;
 #endif
 
@@ -31,13 +35,14 @@ bool Phobos::Optimizations::DisableBalloonHoverPathingFix = false;
 bool Phobos::Optimizations::DisableRadDamageOnBuildings = true;
 bool Phobos::Optimizations::DisableSyncLogging = false;
 bool Phobos::Optimizations::DisableLaserTracking = true;
+bool Phobos::Optimizations::DisablePsychicDetectable = true;
 
-#ifdef STR_GIT_COMMIT
-const wchar_t* Phobos::VersionDescription = L"Phobos nightly build (" STR_GIT_COMMIT L" @ " STR_GIT_BRANCH L"). DO NOT SHIP IN MODS!";
-#elif !defined(IS_RELEASE_VER)
-const wchar_t* Phobos::VersionDescription = L"Phobos development build #" _STR(BUILD_NUMBER) L". Please test the build before shipping.";
-#else
-//const wchar_t* Phobos::VersionDescription = L"Phobos release build v" FILE_VERSION_STR L".";
+// The leading L"" widens the narrow metadata literals it is concatenated with, so that the
+// name and the version are taken from Phobos.version.h rather than spelled out again.
+#ifdef NIGHTLY
+const wchar_t* Phobos::VersionDescription = L"" PRODUCT_NAME " " PRODUCT_VERSION L". DO NOT SHIP IN MODS!";
+#elif defined(TESTING_BUILD)
+const wchar_t* Phobos::VersionDescription = L"" PRODUCT_NAME " " PRODUCT_VERSION L". Please test the build before shipping.";
 #endif
 
 
@@ -60,8 +65,13 @@ void Phobos::CmdLineParse(char** ppArgs, int nNumArgs)
 		{
 			Phobos::AppIconPath = ppArgs[++i];
 		}
-#ifndef IS_RELEASE_VER
-		if (_stricmp(pArg, "-b=" _STR(BUILD_NUMBER)) == 0)
+#ifdef TESTING_BUILD
+		// Suppresses the "please test this build" warning drawn over the game screen.
+		// The exact version of this very build has to be spelled out (it is printed in
+		// the warning itself and in the release title), so that the switch can't be set
+		// once and then silently carried over into a mod release with a newer build.
+		if (_stricmp(pArg, "-HideVersionWarning=" FILE_VERSION_STR) == 0
+			|| _stricmp(pArg, "-HideVersionWarning=v" FILE_VERSION_STR) == 0) // as shown in the warning
 		{
 			HideWarning = true;
 		}
@@ -132,6 +142,13 @@ void Phobos::CmdLineParse(char** ppArgs, int nNumArgs)
 		ExceptionHandler::Init();
 
 	Debug::Log("Initialized version: " PRODUCT_VERSION "\n");
+#ifdef STR_GIT_COMMIT
+	Debug::Log("Git commit: " STR_GIT_COMMIT "\n");
+	Debug::Log("Git dirty: " GIT_DIRTY_FLAG "\n");
+#endif
+#ifdef STR_GIT_REF
+	Debug::Log("Git ref: " STR_GIT_REF "\n");
+#endif
 	Debug::Log("ExceptionHandler is %s\n", dontSetExceptionHandler ? "not present" : "present");
 }
 
@@ -296,6 +313,17 @@ DEFINE_HOOK(0x67E68A, LoadGame_UnsetFlag, 0x5)
 DEFINE_HOOK(0x683E7F, ScenarioClass_Start_Optimizations, 0x7)
 {
 	Phobos::ApplyOptimizations();
+
+	for (const auto pTib : TiberiumClass::Array)
+	{
+		pTib->SpreadLogic.Timer.Start(pTib->Spread);
+		const double growthMult = (ScenarioClass::Instance && ScenarioClass::Instance->SpecialFlags.TiberiumGrows) ? 0.3 : 1.0;
+		pTib->GrowthLogic.Timer.Start(std::max(1, static_cast<int>(pTib->Growth * growthMult)));
+
+		reinterpret_cast<void(__thiscall*)(TiberiumClass*)>(0x7228B0)(pTib);
+		reinterpret_cast<void(__thiscall*)(TiberiumClass*)>(0x7233A0)(pTib);
+	}
+
 	return 0;
 }
 
@@ -304,10 +332,10 @@ DEFINE_HOOK(0x4F4583, GScreenClass_DrawText, 0x6)
 	const int marginX = Phobos::Config::MessageDisplayInCenter ? 28 : 10;
 	int coordY = 0;
 
-#ifndef IS_RELEASE_VER
-#ifndef STR_GIT_COMMIT
+#ifdef TESTING_BUILD
+#ifndef NIGHTLY
 	if (!HideWarning)
-#endif // !STR_GIT_COMMIT
+#endif // !NIGHTLY
 	{
 		auto wanted = Drawing::GetTextDimensions(Phobos::VersionDescription, { 0, 0 }, 0, 2, 0);
 
@@ -325,9 +353,9 @@ DEFINE_HOOK(0x4F4583, GScreenClass_DrawText, 0x6)
 		// add margin for next text
 		coordY = rect.Height;
 	}
-#endif // !IS_RELEASE_VER
+#endif // !RELEASE
 
-	if (!Phobos::Config::ShowGameTime || HouseClass::CurrentPlayer->IsObserver()) // already has a timer
+	if (!Phobos::Config::ShowGameTime || !RulesExt::Global()->ShowGameTime || HouseClass::CurrentPlayer->IsObserver()) // already has a timer
 		return 0;
 
 	wchar_t buffer[0x20] {};
@@ -397,6 +425,10 @@ void Phobos::ApplyOptimizations()
 
 		Patch::Apply_RAW(0x4D62C0, { 0x8A, 0x88, 0x95, 0x06, 0x00, 0x00 });
 	}
+
+	// Disable PsychicDetectable
+	if (Phobos::Optimizations::DisablePsychicDetectable)
+		Patch::Apply_RAW(0x43B150, { 0x55, 0x8B, 0xEC, 0x83, 0xE4, 0xF8 });
 
 	if (!SessionClass::IsMultiplayer())
 	{
