@@ -900,15 +900,16 @@ public:
 		// Ares 0.9
 		, InhibitorRange {}
 		, DesignatorRange {}
-
+			
 		// Ares 0.A
 		, GroupAs { NONE_STR }
-
+			
 		// Ares 0.C
 		, NoAmmoWeapon { -1 }
 		, NoAmmoAmount { 0 }
-
+			
 		// Ares 2.0
+		, Passengers_BySize { true }
 		, Convert_Deploy { }
 
 		// Ares 3.0
