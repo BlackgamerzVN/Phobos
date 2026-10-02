@@ -284,6 +284,10 @@ public:
 	Nullable<int> NoQueueUpToEnter_BoardDistance;
 	Nullable<bool> NoQueueUpToUnload;
 
+	// Jumpjet carryall, cargo side (see UnitTypeExt for the carrier side).
+	Nullable<bool> JumpjetCarryall_Allowed;
+	Valueable<CoordStruct> JumpjetCarryall_Offset;
+
 	Valueable<int> RateDown_Delay;
 	Valueable<bool> RateDown_Reset;
 	Valueable<int> RateDown_Cover_Value;
@@ -724,6 +728,8 @@ public:
 		, NoQueueUpToEnter {}
 		, NoQueueUpToEnter_BoardDistance {}
 		, NoQueueUpToUnload {}
+		, JumpjetCarryall_Allowed {}
+		, JumpjetCarryall_Offset { { 0, 0, 0 } }
 
 		, RateDown_Delay { 0 }
 		, RateDown_Reset { false }
@@ -893,14 +899,14 @@ public:
 		// Ares 0.9
 		, InhibitorRange {}
 		, DesignatorRange {}
-			
+
 		// Ares 0.A
 		, GroupAs { NONE_STR }
-			
+
 		// Ares 0.C
 		, NoAmmoWeapon { -1 }
 		, NoAmmoAmount { 0 }
-			
+
 		// Ares 2.0
 		, Passengers_BySize { true }
 		, Convert_Deploy { }

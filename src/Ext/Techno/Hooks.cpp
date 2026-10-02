@@ -66,6 +66,7 @@ DEFINE_HOOK(0x736480, UnitClass_AI, 0x6)
 	pExt->DepletedAmmoActions();
 	pExt->UpdateSubterraneanHarvester();
 	pExt->UpdateRecoilData();
+	pExt->UpdateJumpjetCarryall();
 
 	// Replace vanilla animation counter code in UnitClass::AI.
 	if (pThis->IsAlive && !pExt->DelayedFireSequencePaused && !((pThis->IsWarpingIn() && pThis->TemporalTargetingMe) || pThis->IsBeingWarpedOut()))
